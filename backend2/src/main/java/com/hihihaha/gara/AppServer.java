@@ -12,7 +12,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 
 public class AppServer {
-    private static final int PORT = 8088;
+    private static int getPort() {
+        String portStr = System.getenv("PORT");
+        if (portStr != null && !portStr.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(portStr.trim());
+            } catch (NumberFormatException ignored) {}
+        }
+        return 8089;
+    }
 
     // Database trong bộ nhớ lưu vết thực
     private static final Map<String, Map<String, Object>> WORK_ORDERS = new ConcurrentHashMap<>();
@@ -23,15 +31,16 @@ public class AppServer {
     public static void main(String[] args) throws IOException {
         initSampleData();
 
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
+        int port = getPort();
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/", new RootHandler());
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
 
         System.out.println("==================================================");
         System.out.println("  HIHIHAHA AUTO - STANDALONE JAVA BACKEND 2");
-        System.out.println("  Port: http://localhost:" + PORT);
-        System.out.println("  API Base URL: http://localhost:" + PORT + "/api/v1");
+        System.out.println("  Port: http://localhost:" + port);
+        System.out.println("  API Base URL: http://localhost:" + port + "/api/v1");
         System.out.println("==================================================");
     }
 

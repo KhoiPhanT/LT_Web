@@ -1,16 +1,20 @@
 @echo off
 chcp 65001 >nul
 echo ===================================================
-echo   DANG KHOI DONG BACKEND 2 (JAVA SERVER - PORT 8088)
+echo   DANG KHOI DONG BACKEND 2 (JAVA SERVER - PORT 8089)
+echo   DATABASE MYSQL DOCKER (PORT 3307)
 echo ===================================================
 cd /d "%~dp0backend2"
+
+set PORT=8089
+set DB_PORT=3307
 
 if not exist "bin" mkdir bin
 echo Dang bien dich source code Java...
 javac -encoding UTF-8 -d bin src\main\java\com\hihihaha\gara\AppServer.java
 
 if %ERRORLEVEL% equ 0 (
-    echo [OK] Bien dich thanh cong! Dang khoi chay server...
+    echo [OK] Bien dich thanh cong! Dang khoi chay server tai port 8089...
     java -cp bin com.hihihaha.gara.AppServer
 ) else (
     echo [LOI] Bien dich that bai! Vui long kiem tra JDK 21.

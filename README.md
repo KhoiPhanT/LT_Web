@@ -18,29 +18,44 @@ LT_WEB/
 │   └── pom.xml           # Cấu hình Maven
 ├── DATABASE_ERD.puml     # Mã nguồn PlantUML Database ERD (Physical schema)
 ├── ENTITY_DIAGRAM.puml   # Mã nguồn PlantUML Conceptual Entity Diagram (Nghiệp vụ)
-├── start_backend.bat     # Script 1-click khởi chạy Backend 2 (Port 8088)
-└── start_client.bat      # Script 1-click khởi chạy Frontend Client 2 (Port 3000)
+├── start_backend.bat     # Script 1-click khởi chạy Backend 2 (Port 8089)
+└── start_client.bat      # Script 1-click khởi chạy Frontend Client 2 (Port 3001)
 ```
 
 ---
 
-## 2. Hướng dẫn chạy nhanh (1-Click)
+## 2. Thông tin Cổng Port (Tách biệt hoàn toàn)
 
-1. **Khởi chạy Backend (Port 8088):**
+| Thành phần | Port | Ghi chú |
+| :--- | :--- | :--- |
+| **Frontend Client 2** | `http://localhost:3001` | Next.js 14 App Router |
+| **Backend 2 Java** | `http://localhost:8089` | RESTful API & Server Proxy |
+| **MySQL Database (Docker)** | `localhost:3307` | Database `hihihaha_db`, user: `root`, pass: `root` |
+
+---
+
+## 3. Hướng dẫn chạy nhanh (1-Click)
+
+1. **Khởi chạy MySQL qua Docker:**
+   - Container đã được kích hoạt chạy nền với port `3307`:
+     ```bash
+     docker start hihihaha_mysql_ltweb
+     ```
+2. **Khởi chạy Backend (Port 8089):**
    - Click đúp vào file `start_backend.bat` hoặc mở terminal:
      ```bash
      .\start_backend.bat
      ```
-2. **Khởi chạy Frontend (Port 3000):**
+3. **Khởi chạy Frontend (Port 3001):**
    - Click đúp vào file `start_client.bat` hoặc mở terminal:
      ```bash
      .\start_client.bat
      ```
-3. Mở trình duyệt truy cập: `http://localhost:3000`
+4. Mở trình duyệt truy cập: `http://localhost:3001`
 
 ---
 
-## 3. Tài khoản đăng nhập kiểm thử
+## 4. Tài khoản đăng nhập kiểm thử
 
 | Vai trò | Tên đăng nhập | Mật khẩu | Mã PIN KTV | Ghi chú |
 | :--- | :--- | :--- | :--- | :--- |
