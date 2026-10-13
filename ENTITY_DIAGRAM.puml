@@ -1,0 +1,126 @@
+@startuml hihihaha_conceptual_entity_diagram
+!theme plain
+skinparam roundcorner 10
+skinparam class {
+    BackgroundColor #F8F9FA
+    ArrowColor #2C3E50
+    BorderColor #2C3E50
+    HeaderBackgroundColor #34495E
+}
+skinparam classHeader {
+    FontColor White
+    FontStyle bold
+}
+
+title **HIHIHAHA AUTO - SƠ ĐỒ THỰC THỂ KHÁI NIỆM (CONCEPTUAL ENTITY DIAGRAM)**
+
+entity "User\n(Người dùng / Nhân viên)" as User {
+    + id : Integer
+    --
+    username : String
+    password : String
+    fullName : String
+    phoneNumber : String
+    email : String
+    role : Enum [ADVISOR, TECHNICIAN, MANAGER, OWNER]
+    pinCode : String
+    createdAt : DateTime
+}
+
+entity "Customer\n(Khách hàng)" as Customer {
+    + id : Integer
+    --
+    fullName : String
+    phoneNumber : String
+    email : String
+    address : String
+    createdAt : DateTime
+}
+
+entity "Vehicle\n(Xe tiếp nhận)" as Vehicle {
+    + id : Integer
+    --
+    licensePlate : String
+    brand : String
+    model : String
+    manufactureYear : Integer
+    odoKm : Integer
+    createdAt : DateTime
+}
+
+entity "WorkshopBay\n(Khoang nâng sửa chữa)" as WorkshopBay {
+    + id : Integer
+    --
+    bayCode : String
+    bayName : String
+    bayType : Enum [TWO_POST, FOUR_POST, ELECTRICAL, WHEEL]
+    isOccupied : Boolean
+}
+
+entity "Part\n(Phụ tùng kho)" as Part {
+    + id : Integer
+    --
+    partCode : String
+    partName : String
+    category : String
+    unit : String
+    price : Decimal
+    stockQuantity : Integer
+    locationBin : String
+    createdAt : DateTime
+}
+
+entity "WorkOrder\n(Lệnh sửa chữa)" as WorkOrder {
+    + id : Integer
+    --
+    orderCode : String
+    status : Enum [RECEIVED, IN_PROGRESS, COMPLETED, ...]
+    customerSymptoms : Text
+    advisorDiagnosis : Text
+    totalPartsAmount : Decimal
+    totalLaborAmount : Decimal
+    totalAmount : Decimal
+    isQuoteApproved : Boolean
+    createdAt : DateTime
+    updatedAt : DateTime
+}
+
+entity "WorkOrderItem\n(Hạng mục công việc / Phụ tùng)" as WorkOrderItem {
+    + id : Integer
+    --
+    itemType : Enum [PART, LABOR]
+    itemName : String
+    quantity : Integer
+    unitPrice : Decimal
+    totalPrice : Decimal
+    isDone : Boolean
+}
+
+entity "Invoice\n(Hóa đơn thanh toán)" as Invoice {
+    + id : Integer
+    --
+    invoiceCode : String
+    totalAmount : Decimal
+    paymentMethod : Enum [CASH, VIETQR]
+    paymentStatus : Enum [UNPAID, PAID]
+    paidAt : DateTime
+    createdAt : DateTime
+}
+
+' ========================================================
+' MỐI QUAN HỆ NGHIỆP VỤ GIỮA CÁC THỰC THỂ (BUSINESS RELATIONS)
+' ========================================================
+
+Customer "1" -- "0..*" Vehicle : "Sở hữu" >
+Vehicle "1" -- "0..*" WorkOrder : "Được lập lệnh cho" >
+
+User "1" -- "0..*" WorkOrder : "Cố vấn (Advisor) tiếp nhận & lập" >
+User "0..1" -- "0..*" WorkOrder : "Kỹ thuật viên (Technician) phụ trách" >
+WorkshopBay "0..1" -- "0..*" WorkOrder : "Điều phối vào khoang" >
+
+WorkOrder "1" *-- "1..*" WorkOrderItem : "Bao gồm các hạng mục" >
+Part "0..1" -- "0..*" WorkOrderItem : "Cung ứng vật tư cho" >
+
+WorkOrder "1" -- "1" Invoice : "Quyết toán thành" >
+
+@enduml
