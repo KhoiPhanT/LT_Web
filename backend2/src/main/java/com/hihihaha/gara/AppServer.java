@@ -59,12 +59,12 @@ public class AppServer {
         INVENTORY.add(createPart("FLT-AIR-HD02", "Lọc gió động cơ Honda Civic", "FILTRATION", "Cái", 250000, 38, "KHO-A2-K1"));
 
         // Lệnh sửa chữa mẫu
-        addSampleOrder("WO-20261001-0089", "51K-888.88", "Toyota Camry 2.5Q", "Minh Thảo", "0912345678", "IN_PROGRESS", 60, "Phạm Thợ Xưởng (THO-01)", "0988888803", "Khoang Nâng 01 (Cầu 2 trụ - Bảo Dưỡng Nhanh)", 2580000);
-        addSampleOrder("WO-20261001-0090", "51F-123.45", "Mazda CX-5 2.0", "Trần Thị B", "0903112233", "INSPECTION", 10, "Trần Văn Cường (THO-02)", "0988888804", "Khoang Nâng 02 (Cầu cắt kéo - Máy & Gầm)", 900000);
-        addSampleOrder("WO-20261001-0088", "30E-999.99", "Mercedes-Benz E300", "Lê Hoàng C", "0977445566", "QUOTE_SENT", 20, "Chưa gán thợ", null, "Chưa xếp khoang", 4500000);
-        addSampleOrder("WO-20260930-0085", "60A-777.77", "Honda CR-V 1.5 Turbo", "Phạm Văn D", "0938778899", "QUOTE_APPROVED", 30, "Lê Hoàng Long (THO-03)", "0988888805", "Khoang Nâng 03 (Cầu 4 trụ - Cân chỉnh Hunter 3D)", 1750000);
-        addSampleOrder("WO-20260930-0082", "51H-555.55", "Ford Ranger Wildtrak", "Hoàng Minh E", "0918990011", "QUALITY_CHECK", 85, "Phạm Minh Tuấn (THO-04)", "0988888806", "Khoang Nâng 04 (Khu vực chẩn đoán điện & ECU)", 3200000);
-        addSampleOrder("WO-20260929-0078", "51A-111.11", "Hyundai Tucson 2.0", "Vũ Đình F", "0988223344", "COMPLETED", 100, "Phạm Thợ Xưởng (THO-01)", "0988888803", "Bãi bàn giao xe", 1200000);
+        addSampleOrder("WO-20261001-0089", "51K-888.88", "Toyota Camry 2.5Q", "Minh Thảo", "0912345678", "IN_PROGRESS", 60, "Phạm Thợ Xưởng (THO-01)", "0988888803", "Khoang Nâng 01 (Cầu 2 trụ - Bảo Dưỡng Nhanh)", 2580000, null);
+        addSampleOrder("WO-20261001-0090", "51F-123.45", "Mazda CX-5 2.0", "Trần Thị B", "0903112233", "INSPECTION", 10, "Trần Văn Cường (THO-02)", "0988888804", "Khoang Nâng 02 (Cầu cắt kéo - Máy & Gầm)", 900000, null);
+        addSampleOrder("WO-20261001-0088", "30E-999.99", "Mercedes-Benz E300", "Lê Hoàng C", "0977445566", "QUOTE_SENT", 20, "Chưa gán thợ", null, "Chưa xếp khoang", 4500000, null);
+        addSampleOrder("WO-20260930-0085", "60A-777.77", "Honda CR-V 1.5 Turbo", "Phạm Văn D", "0938778899", "QUOTE_APPROVED", 30, "Lê Hoàng Long (THO-03)", "0988888805", "Khoang Nâng 03 (Cầu 4 trụ - Cân chỉnh Hunter 3D)", 1750000, null);
+        addSampleOrder("WO-20260930-0082", "51H-555.55", "Ford Ranger Wildtrak", "Hoàng Minh E", "0918990011", "QUALITY_CHECK", 85, "Phạm Minh Tuấn (THO-04)", "0988888806", "Khoang Nâng 04 (Khu vực chẩn đoán điện & ECU)", 3200000, null);
+        addSampleOrder("WO-20260929-0078", "51A-111.11", "Hyundai Tucson 2.0", "Vũ Đình F", "0988223344", "COMPLETED", 100, "Phạm Thợ Xưởng (THO-01)", "0988888803", "Bãi bàn giao xe", 1200000, null);
     }
 
     private static Map<String, Object> createTech(String id, String name, String role, String pin) {
@@ -92,10 +92,11 @@ public class AppServer {
         p.put("stock_quantity", stock);
         p.put("stock", stock);
         p.put("location_bin", bin);
+        p.put("location_rack", bin);
         return p;
     }
 
-    private static void addSampleOrder(String code, String plate, String model, String custName, String custPhone, String status, int progress, String techName, String techId, String bay, double total) {
+    private static void addSampleOrder(String code, String plate, String model, String custName, String custPhone, String status, int progress, String techName, String techId, String bay, double total, List<Map<String, Object>> customItems) {
         Map<String, Object> order = new HashMap<>();
         order.put("id", "db-card-" + code);
         order.put("order_code", code);
@@ -119,36 +120,40 @@ public class AppServer {
         order.put("assigned_technicians", List.of(techObj));
         order.put("assigned_technician", Map.of("full_name", techName, "id", techId != null ? techId : ""));
 
-        // Items mẫu
+        // Items
         List<Map<String, Object>> items = new ArrayList<>();
-        Map<String, Object> item1 = new HashMap<>();
-        item1.put("id", "it-1");
-        item1.put("name", "Bảo dưỡng định kỳ & Kiểm tra tổng quát");
-        item1.put("item_name", "Bảo dưỡng định kỳ & Kiểm tra tổng quát");
-        item1.put("type", "LABOR");
-        item1.put("item_type", "LABOR");
-        item1.put("quantity", 1);
-        item1.put("price", 300000);
-        item1.put("unit_price", 300000);
-        item1.put("total", 300000);
-        item1.put("total_price", 300000);
-        item1.put("status", progress >= 50 ? "done" : "pending");
-        items.add(item1);
+        if (customItems != null && !customItems.isEmpty()) {
+            items.addAll(customItems);
+        } else {
+            Map<String, Object> item1 = new HashMap<>();
+            item1.put("id", "it-1");
+            item1.put("name", "Bảo dưỡng định kỳ & Kiểm tra tổng quát");
+            item1.put("item_name", "Bảo dưỡng định kỳ & Kiểm tra tổng quát");
+            item1.put("type", "LABOR");
+            item1.put("item_type", "LABOR");
+            item1.put("quantity", 1);
+            item1.put("price", 300000);
+            item1.put("unit_price", 300000);
+            item1.put("total", 300000);
+            item1.put("total_price", 300000);
+            item1.put("status", progress >= 50 ? "done" : "pending");
+            items.add(item1);
 
-        Map<String, Object> item2 = new HashMap<>();
-        item2.put("id", "it-2");
-        item2.put("part_code", "OIL-MOBIL-5W30");
-        item2.put("name", "Dầu nhớt Mobil 1 5W-30 (Can 4L)");
-        item2.put("item_name", "Dầu nhớt Mobil 1 5W-30 (Can 4L)");
-        item2.put("type", "PART");
-        item2.put("item_type", "PART");
-        item2.put("quantity", 1);
-        item2.put("price", 850000);
-        item2.put("unit_price", 850000);
-        item2.put("total", 850000);
-        item2.put("total_price", 850000);
-        item2.put("status", progress >= 50 ? "done" : "pending");
-        items.add(item2);
+            Map<String, Object> item2 = new HashMap<>();
+            item2.put("id", "it-2");
+            item2.put("part_code", "OIL-MOBIL-5W30");
+            item2.put("name", "Dầu nhớt Mobil 1 5W-30 (Can 4L)");
+            item2.put("item_name", "Dầu nhớt Mobil 1 5W-30 (Can 4L)");
+            item2.put("type", "PART");
+            item2.put("item_type", "PART");
+            item2.put("quantity", 1);
+            item2.put("price", 850000);
+            item2.put("unit_price", 850000);
+            item2.put("total", 850000);
+            item2.put("total_price", 850000);
+            item2.put("status", progress >= 50 ? "done" : "pending");
+            items.add(item2);
+        }
 
         order.put("items", items);
         order.put("tasks", items);
@@ -353,6 +358,29 @@ public class AppServer {
                     if (path.endsWith("/estimate")) {
                         orderCode = segments[segments.length - 2];
                         Map<String, Object> order = WORK_ORDERS.get(orderCode);
+                        if (order != null) {
+                            List<Map<String, Object>> parsedItems = parseEstimateItems(body);
+                            if (!parsedItems.isEmpty()) {
+                                double newTotal = 0;
+                                for (Map<String, Object> it : parsedItems) {
+                                    Number pr = (Number) it.get("price");
+                                    Number qt = (Number) it.get("quantity");
+                                    if (pr != null && qt != null) {
+                                        newTotal += pr.doubleValue() * qt.doubleValue();
+                                    }
+                                }
+                                order.put("items", parsedItems);
+                                order.put("tasks", parsedItems);
+                                order.put("total_amount", newTotal);
+                                if (order.get("estimate") instanceof Map) {
+                                    Map<String, Object> est = (Map<String, Object>) order.get("estimate");
+                                    est.put("items", parsedItems);
+                                    est.put("total_amount", newTotal);
+                                    est.put("pretax_amount", newTotal * 0.92);
+                                    est.put("vat_amount", newTotal * 0.08);
+                                }
+                            }
+                        }
                         sendJson(ex, 200, "{\"success\":true,\"message\":\"Cập nhật báo giá thành công\",\"data\":" + (order != null ? toJsonObject(order) : "{}") + "}");
                         return;
                     }
@@ -415,7 +443,17 @@ public class AppServer {
                     String phone = extractJsonString(body, "customer_phone", "0900000000");
                     String custName = extractJsonString(body, "customer_name", "Khách Hàng Mới");
                     String model = extractJsonString(body, "vehicle_model", "Xe Khách Hàng");
-                    addSampleOrder(code, plate, model, custName, phone, "INSPECTION", 10, "Chưa gán thợ", null, "Khu vực tiếp nhận", 1000000);
+
+                    List<Map<String, Object>> parsedItems = parseEstimateItems(body);
+                    double total = 0;
+                    for (Map<String, Object> it : parsedItems) {
+                        Number pr = (Number) it.get("price");
+                        Number qt = (Number) it.get("quantity");
+                        if (pr != null && qt != null) total += pr.doubleValue() * qt.doubleValue();
+                    }
+                    if (total == 0) total = 1000000;
+
+                    addSampleOrder(code, plate, model, custName, phone, "INSPECTION", 10, "Chưa gán thợ", null, "Khu vực tiếp nhận", total, parsedItems);
                     Map<String, Object> created = WORK_ORDERS.get(code);
                     sendJson(ex, 201, "{\"success\":true,\"data\":" + toJsonObject(created) + "}");
                     return;
@@ -436,7 +474,34 @@ public class AppServer {
                     return;
                 }
 
-                // 13. INVENTORY: GET /inventory
+                // 13. INVENTORY: ADJUSTMENTS (KIỂM KÊ KHO) & GET/POST INVENTORY
+                if (path.contains("/inventory/adjustments") && "POST".equals(method)) {
+                    String pCode = extractJsonString(body, "part_code", "");
+                    int newQty = extractJsonInt(body, "new_quantity", 50);
+                    for (Map<String, Object> p : INVENTORY) {
+                        if (pCode.equals(p.get("part_code"))) {
+                            p.put("stock_quantity", newQty);
+                            p.put("stock", newQty);
+                            break;
+                        }
+                    }
+                    sendJson(ex, 200, "{\"success\":true,\"message\":\"Cập nhật kiểm kê tồn kho thành công!\"}");
+                    return;
+                }
+
+                if (path.contains("/inventory") && "POST".equals(method)) {
+                    String code = extractJsonString(body, "part_code", "PART-" + System.currentTimeMillis() % 1000);
+                    String name = extractJsonString(body, "part_name", "Phụ tùng mới");
+                    String cat = extractJsonString(body, "category", "Linh kiện phụ trợ");
+                    String unit = extractJsonString(body, "unit", "Cái");
+                    double price = extractJsonDouble(body, "price", 500000);
+                    int qty = extractJsonInt(body, "stock_quantity", 10);
+                    String bin = extractJsonString(body, "location_rack", "KHO-A1");
+                    INVENTORY.add(createPart(code, name, cat, unit, price, qty, bin));
+                    sendJson(ex, 201, "{\"success\":true,\"message\":\"Thêm phụ tùng mới thành công!\"}");
+                    return;
+                }
+
                 if (path.contains("/inventory")) {
                     sendJson(ex, 200, "{\"success\":true,\"data\":{\"items\":" + toJsonArray(INVENTORY) + ",\"total\":" + INVENTORY.size() + ",\"page\":1,\"limit\":15}}");
                     return;
@@ -529,6 +594,63 @@ public class AppServer {
                 else if (!sb.isEmpty()) break;
             }
             try { return Integer.parseInt(sb.toString()); } catch (Exception e) { return def; }
+        }
+
+        private double extractJsonDouble(String json, String key, double def) {
+            String search = "\"" + key + "\"";
+            int idx = json.indexOf(search);
+            if (idx == -1) return def;
+            int colon = json.indexOf(":", idx + search.length());
+            if (colon == -1) return def;
+            StringBuilder sb = new StringBuilder();
+            for (int i = colon + 1; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (Character.isDigit(c) || c == '.') sb.append(c);
+                else if (!sb.isEmpty()) break;
+            }
+            try { return Double.parseDouble(sb.toString()); } catch (Exception e) { return def; }
+        }
+
+        // Trích xuất danh sách items từ JSON body
+        private List<Map<String, Object>> parseEstimateItems(String json) {
+            List<Map<String, Object>> list = new ArrayList<>();
+            int itemsIdx = json.indexOf("\"items\"");
+            if (itemsIdx == -1) return list;
+            int startBracket = json.indexOf("[", itemsIdx);
+            if (startBracket == -1) return list;
+            int endBracket = json.lastIndexOf("]");
+            if (endBracket == -1 || endBracket <= startBracket) return list;
+
+            String arrayContent = json.substring(startBracket + 1, endBracket);
+            String[] objects = arrayContent.split("\\},\\s*\\{");
+            int i = 1;
+            for (String raw : objects) {
+                String clean = raw.replace("{", "").replace("}", "");
+                String name = extractJsonString(clean, "name", "Hạng mục " + i);
+                String code = extractJsonString(clean, "part_code", "PART-" + i);
+                String type = extractJsonString(clean, "type", "PART");
+                int qty = extractJsonInt(clean, "quantity", 1);
+                double price = extractJsonDouble(clean, "unit_price", 200000);
+                if (price == 0) price = extractJsonDouble(clean, "unitPrice", 200000);
+
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", "it-" + i);
+                item.put("name", name);
+                item.put("item_name", name);
+                item.put("part_code", code);
+                item.put("code", code);
+                item.put("type", type);
+                item.put("item_type", type);
+                item.put("quantity", qty);
+                item.put("price", price);
+                item.put("unit_price", price);
+                item.put("total", price * qty);
+                item.put("total_price", price * qty);
+                item.put("status", "pending");
+                list.add(item);
+                i++;
+            }
+            return list;
         }
 
         private String toJsonObject(Map<String, Object> map) {
