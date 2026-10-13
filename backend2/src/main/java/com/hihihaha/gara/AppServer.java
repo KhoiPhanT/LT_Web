@@ -6,7 +6,6 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,7 +14,7 @@ import java.util.concurrent.Executors;
 public class AppServer {
     private static final int PORT = 8088;
 
-    // Database trong bộ nhớ & lưu vết
+    // Database trong bộ nhớ lưu vết thực
     private static final Map<String, Map<String, Object>> WORK_ORDERS = new ConcurrentHashMap<>();
     private static final List<Map<String, Object>> INVENTORY = new ArrayList<>();
     private static final List<Map<String, Object>> TECHNICIANS = new ArrayList<>();
@@ -138,6 +137,7 @@ public class AppServer {
 
         Map<String, Object> item2 = new HashMap<>();
         item2.put("id", "it-2");
+        item2.put("part_code", "OIL-MOBIL-5W30");
         item2.put("name", "Dầu nhớt Mobil 1 5W-30 (Can 4L)");
         item2.put("item_name", "Dầu nhớt Mobil 1 5W-30 (Can 4L)");
         item2.put("type", "PART");
@@ -152,13 +152,54 @@ public class AppServer {
 
         order.put("items", items);
         order.put("tasks", items);
+
+        // Trường estimate phục vụ Báo giá & Khách hàng portal
+        Map<String, Object> estimate = new HashMap<>();
+        estimate.put("total_amount", total);
+        estimate.put("pretax_amount", total * 0.92);
+        estimate.put("vat_amount", total * 0.08);
+        estimate.put("approval_status", ("QUOTE_SENT".equals(status) || "DRAFT".equals(status) || "INSPECTION".equals(status)) ? "PENDING" : "APPROVED");
+        estimate.put("items", items);
+        order.put("estimate", estimate);
+
+        // Timeline lịch sử trạng thái
+        List<Map<String, Object>> timeline = new ArrayList<>();
+        timeline.add(Map.of("status", "INSPECTION", "updated_by", "Vũ Quang Tùng (Cố Vấn)", "note", "Tiếp nhận xe và chẩn đoán tổng quát", "updated_at", "08:30"));
+        if (!"INSPECTION".equals(status)) {
+            timeline.add(Map.of("status", "QUOTE_SENT", "updated_by", "Vũ Quang Tùng (Cố Vấn)", "note", "Gửi báo giá tới khách hàng", "updated_at", "09:00"));
+        }
+        if (!"INSPECTION".equals(status) && !"QUOTE_SENT".equals(status)) {
+            timeline.add(Map.of("status", "QUOTE_APPROVED", "updated_by", custName, "note", "Khách hàng duyệt báo giá trực tuyến", "updated_at", "09:15"));
+            timeline.add(Map.of("status", "IN_PROGRESS", "updated_by", techName, "note", "KTV bắt đầu thi công tại khoang", "updated_at", "09:45"));
+        }
+        if ("COMPLETED".equals(status)) {
+            timeline.add(Map.of("status", "COMPLETED", "updated_by", "Lê Quản Đốc", "note", "Nghiệm thu KCS và bàn giao xe", "updated_at", "16:00"));
+        }
+        order.put("workflow_timeline", timeline);
+
+        // Ảnh chụp nghiệm thu
+        List<Map<String, Object>> photos = new ArrayList<>();
+        photos.add(Map.of(
+            "id", "p1",
+            "url", "https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=600&auto=format&fit=crop&q=80",
+            "caption", "Kiểm tra hiện trường má phanh mòn trước khi thay",
+            "uploaded_at", "09:30"
+        ));
+        photos.add(Map.of(
+            "id", "p2",
+            "url", "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=600&auto=format&fit=crop&q=80",
+            "caption", "Má phanh mới đã lắp ráp và siết ốc chuẩn lực",
+            "uploaded_at", "11:20"
+        ));
+        order.put("inspection_photos", photos);
+
         WORK_ORDERS.put(code, order);
     }
 
     static class RootHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
-            // Cho phép CORS
+            // Cấu hình CORS Header
             ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
             ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
             ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Origin, X-Requested-With");
@@ -198,7 +239,6 @@ public class AppServer {
                 // 3. AUTH: STAFF LOGIN
                 if (path.endsWith("/auth/staff-login")) {
                     String phone = extractJsonString(body, "phone_number", "");
-                    String pass = extractJsonString(body, "password", "");
                     String role = "SERVICE_ADVISOR";
                     String name = "Vũ Quang Tùng (Cố Vấn)";
 
@@ -274,10 +314,48 @@ public class AppServer {
                     return;
                 }
 
-                // 9. WORK ORDERS: DETAIL / ESTIMATE / ASSIGN / STATUS / PROGRESS
+                // 9. WORK ORDERS: APPROVE ESTIMATE & REJECT ESTIMATE
+                if (path.contains("/work-orders/") && path.endsWith("/approve-estimate")) {
+                    String[] segments = path.split("/");
+                    String orderCode = segments[segments.length - 2];
+                    Map<String, Object> order = WORK_ORDERS.get(orderCode);
+                    if (order != null) {
+                        order.put("current_status", "IN_PROGRESS");
+                        order.put("status", "IN_PROGRESS");
+                        if (order.get("estimate") instanceof Map) {
+                            ((Map<String, Object>) order.get("estimate")).put("approval_status", "APPROVED");
+                        }
+                    }
+                    sendJson(ex, 200, "{\"success\":true,\"message\":\"Ký duyệt báo giá thành công! Lệnh đã được chuyển tới xưởng.\",\"data\":" + (order != null ? toJsonObject(order) : "{}") + "}");
+                    return;
+                }
+
+                if (path.contains("/work-orders/") && path.endsWith("/reject-estimate")) {
+                    String[] segments = path.split("/");
+                    String orderCode = segments[segments.length - 2];
+                    Map<String, Object> order = WORK_ORDERS.get(orderCode);
+                    if (order != null) {
+                        order.put("current_status", "QUOTE_SENT");
+                        if (order.get("estimate") instanceof Map) {
+                            ((Map<String, Object>) order.get("estimate")).put("approval_status", "REJECTED");
+                        }
+                    }
+                    sendJson(ex, 200, "{\"success\":true,\"message\":\"Đã ghi nhận yêu cầu điều chỉnh báo giá!\",\"data\":" + (order != null ? toJsonObject(order) : "{}") + "}");
+                    return;
+                }
+
+                // 10. WORK ORDERS: ESTIMATE UPDATE / PROGRESS / STATUS / ASSIGN / DETAIL
                 if (path.contains("/work-orders/")) {
                     String[] segments = path.split("/");
                     String orderCode = segments[segments.length - 1];
+
+                    // UPDATE ESTIMATE: PUT /work-orders/:code/estimate
+                    if (path.endsWith("/estimate")) {
+                        orderCode = segments[segments.length - 2];
+                        Map<String, Object> order = WORK_ORDERS.get(orderCode);
+                        sendJson(ex, 200, "{\"success\":true,\"message\":\"Cập nhật báo giá thành công\",\"data\":" + (order != null ? toJsonObject(order) : "{}") + "}");
+                        return;
+                    }
 
                     // UPDATE PROGRESS: /work-orders/:code/progress
                     if (path.endsWith("/progress")) {
@@ -330,7 +408,7 @@ public class AppServer {
                     }
                 }
 
-                // 10. CREATE WORK ORDER: POST /work-orders
+                // 11. CREATE WORK ORDER: POST /work-orders
                 if (path.endsWith("/work-orders") && "POST".equals(method)) {
                     String code = "WO-" + System.currentTimeMillis() % 100000;
                     String plate = extractJsonString(body, "license_plate", "51K-999.99");
@@ -343,19 +421,34 @@ public class AppServer {
                     return;
                 }
 
-                // 11. INVENTORY: GET /inventory
+                // 12. VEHICLES: GET /vehicles
+                if (path.contains("/vehicles")) {
+                    List<Map<String, Object>> vehicles = new ArrayList<>();
+                    for (Map<String, Object> wo : WORK_ORDERS.values()) {
+                        vehicles.add(Map.of(
+                            "license_plate", wo.get("license_plate"),
+                            "model", wo.get("vehicle_model"),
+                            "customer_name", wo.get("customer_name"),
+                            "customer_phone", wo.get("customer_phone")
+                        ));
+                    }
+                    sendJson(ex, 200, "{\"success\":true,\"data\":" + toJsonArray(vehicles) + "}");
+                    return;
+                }
+
+                // 13. INVENTORY: GET /inventory
                 if (path.contains("/inventory")) {
                     sendJson(ex, 200, "{\"success\":true,\"data\":{\"items\":" + toJsonArray(INVENTORY) + ",\"total\":" + INVENTORY.size() + ",\"page\":1,\"limit\":15}}");
                     return;
                 }
 
-                // 12. BAYS: GET /bays
+                // 14. BAYS: GET /bays
                 if (path.contains("/bays")) {
                     sendJson(ex, 200, "{\"success\":true,\"data\":" + toJsonArrayString(BAYS) + "}");
                     return;
                 }
 
-                // 13. PAYMENTS: CONFIRM & CREATE PAYMENT URL
+                // 15. PAYMENTS: CONFIRM & CREATE PAYMENT URL
                 if (path.contains("/payments/confirm")) {
                     String orderCode = extractJsonString(body, "order_code", "");
                     Map<String, Object> order = WORK_ORDERS.get(orderCode);
@@ -373,7 +466,7 @@ public class AppServer {
                     return;
                 }
 
-                // 14. AI DIAGNOSE
+                // 16. AI DIAGNOSE
                 if (path.contains("/ai/diagnose")) {
                     sendJson(ex, 200, "{\"success\":true,\"data\":{\"diagnosis\":\"Má phanh bị mòn và đĩa phanh có rãnh xước nhẹ. Cần vệ sinh và thay má phanh mới.\",\"recommended_parts\":[\"BRK-PAD-FR-CAM\",\"OIL-MOBIL-5W30\"]}}");
                     return;
