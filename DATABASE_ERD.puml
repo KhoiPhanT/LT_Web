@@ -1,133 +1,77 @@
-# DIAGRAM DATABASE ERD - HIHIHAHA AUTO (LT_WEB)
-
-Dưới đây là mã nguồn **PlantUML** biểu diễn lược đồ quan hệ thực thể (ERD - Entity Relationship Diagram) cho cơ sở dữ liệu MySQL của dự án `LT_WEB`. Lược đồ chuẩn hóa theo kiến trúc CRUD đơn giản (gồm 8 bảng cốt lõi) được định nghĩa trong file `init.sql`.
-
-```plantuml
-@startuml hihihaha_database_erd
-!theme plain
-skinparam linetype ortho
-skinparam roundcorner 5
-skinparam class {
-    BackgroundColor White
-    ArrowColor #2c3e50
-    BorderColor #34495e
+@startuml
+' Phụ trách phần mới: Khởi (quan hệ lệnh), Tân (kho/dịch vụ), Kiệt (tiến độ), Lợi (hóa đơn).
+title HiHiHaHa Auto - 8 bảng MySQL demo
+entity users { * id : BIGINT
+  --
+  full_name : VARCHAR
+  phone_number : VARCHAR <<unique>>
+  password_hash : VARCHAR
+  role : MANAGER/TECHNICIAN
 }
-
-title **HIHIHAHA AUTO - DATABASE ERD (LT_WEB / MYSQL)**
-
-entity "users" as users {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * username : VARCHAR(50) <<UNIQUE>>
-    * password : VARCHAR(100)
-    * full_name : VARCHAR(100)
-    * phone_number : VARCHAR(20)
-    email : VARCHAR(100)
-    * role : VARCHAR(30)
-    pin_code : VARCHAR(10)
-    created_at : TIMESTAMP
+entity customers { * id : BIGINT
+  --
+  full_name : VARCHAR
+  phone_number : VARCHAR <<unique>>
+  email : VARCHAR
 }
-
-entity "customers" as customers {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * full_name : VARCHAR(100)
-    * phone_number : VARCHAR(20) <<UNIQUE>>
-    email : VARCHAR(100)
-    address : VARCHAR(255)
-    created_at : TIMESTAMP
+entity vehicles { * id : BIGINT
+  --
+  customer_id : BIGINT
+  license_plate : VARCHAR <<unique>>
+  model : VARCHAR
 }
-
-entity "vehicles" as vehicles {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * license_plate : VARCHAR(20) <<UNIQUE>>
-    * customer_id : INT <<FK>>
-    * brand : VARCHAR(50)
-    * model : VARCHAR(50)
-    manufacture_year : INT
-    odo_km : INT
-    created_at : TIMESTAMP
+entity parts { * id : BIGINT
+  --
+  part_code : VARCHAR <<unique>>
+  part_name : VARCHAR
+  unit : VARCHAR
+  price : DECIMAL
+  stock_quantity : INT
 }
-
-entity "workshop_bays" as workshop_bays {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * bay_code : VARCHAR(20) <<UNIQUE>>
-    * bay_name : VARCHAR(50)
-    * bay_type : VARCHAR(50)
-    is_occupied : BOOLEAN
+entity services { * id : BIGINT
+  --
+  service_code : VARCHAR <<unique>>
+  service_name : VARCHAR
+  labor_price : DECIMAL
+  default_part_id : BIGINT (nullable)
+  default_part_quantity : INT
 }
-
-entity "parts" as parts {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * part_code : VARCHAR(50) <<UNIQUE>>
-    * part_name : VARCHAR(150)
-    * category : VARCHAR(50)
-    unit : VARCHAR(20)
-    * price : DECIMAL(12,2)
-    * stock_quantity : INT
-    location_bin : VARCHAR(50)
-    created_at : TIMESTAMP
+entity work_orders { * id : BIGINT
+  --
+  order_code : VARCHAR <<unique>>
+  vehicle_id : BIGINT
+  created_by : BIGINT
+  assigned_to : BIGINT
+  status : ENUM
+  assigned_at : TIMESTAMP
+  finished_at : TIMESTAMP
+  stock_deducted_at : TIMESTAMP
 }
-
-entity "work_orders" as work_orders {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * order_code : VARCHAR(50) <<UNIQUE>>
-    * vehicle_id : INT <<FK>>
-    * advisor_id : INT <<FK>>
-    bay_id : INT <<FK, NULL>>
-    technician_id : INT <<FK, NULL>>
-    * status : VARCHAR(50)
-    customer_symptoms : TEXT
-    advisor_diagnosis : TEXT
-    total_parts_amount : DECIMAL(12,2)
-    total_labor_amount : DECIMAL(12,2)
-    total_amount : DECIMAL(12,2)
-    is_quote_approved : BOOLEAN
-    created_at : TIMESTAMP
-    updated_at : TIMESTAMP
+entity work_order_items { * id : BIGINT
+  --
+  work_order_id : BIGINT
+  part_id : BIGINT (nullable)
+  service_id : BIGINT (nullable)
+  item_type : PART/LABOR
+  progress_percent : 0/50/100
+  quantity : INT
+  unit_price : DECIMAL
 }
-
-entity "work_order_items" as work_order_items {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * work_order_id : INT <<FK>>
-    part_id : INT <<FK, NULL>>
-    * item_type : VARCHAR(20)
-    * item_name : VARCHAR(150)
-    * quantity : INT
-    * unit_price : DECIMAL(12,2)
-    * total_price : DECIMAL(12,2)
-    is_done : BOOLEAN
+entity invoices { * id : BIGINT
+  --
+  work_order_id : BIGINT <<unique>>
+  amount : DECIMAL
+  payment_status : ENUM
+  reported_at : TIMESTAMP
+  paid_at : TIMESTAMP
 }
-
-entity "invoices" as invoices {
-    * id : INT <<PK, AUTO_INCREMENT>>
-    --
-    * invoice_code : VARCHAR(50) <<UNIQUE>>
-    * work_order_id : INT <<FK, UNIQUE>>
-    * total_amount : DECIMAL(12,2)
-    payment_method : VARCHAR(30)
-    payment_status : VARCHAR(20)
-    paid_at : TIMESTAMP
-    created_at : TIMESTAMP
-}
-
-' Relations
-customers ||--o{ vehicles : "1 sở hữu nhiều"
-vehicles ||--o{ work_orders : "1 có nhiều lệnh sửa"
-
-users ||--o{ work_orders : "advisor lập"
-users ||--o{ work_orders : "technician phụ trách"
-workshop_bays ||--o{ work_orders : "tiếp nhận vào khoang"
-
-work_orders ||--|{ work_order_items : "gồm các hạng mục"
-parts ||--o{ work_order_items : "xuất kho cho"
-
-work_orders ||--|| invoices : "xuất 1 hóa đơn"
-
+customers ||--o{ vehicles
+vehicles ||--o{ work_orders
+users ||--o{ work_orders : created_by
+users |o--o{ work_orders : assigned_to
+work_orders ||--o{ work_order_items
+parts |o--o{ work_order_items
+parts |o--o{ services : default_part
+services |o--o{ work_order_items
+work_orders ||--|| invoices
 @enduml
-```

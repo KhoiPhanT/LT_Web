@@ -1,24 +1,10 @@
+// Phụ trách phần tinh gọn: Tân. Metadata khớp các tính năng đang chạy.
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "sonner";
 import "./globals.css";
 
-const jakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin", "vietnamese"],
-  variable: "--font-jakarta",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
-  title: "HiHiHaHa Auto | Hệ Thống Quản Trị Dịch Vụ Ô Tô Thông Minh 4S",
-  description: "Trung tâm dịch vụ bảo dưỡng, sửa chữa ô tô thông minh ứng dụng Graph-RAG AI, kiểm soát kho găng và ký duyệt báo giá điện tử thời gian thực.",
+  title: "HiHiHaHa Auto | Quản lý gara",
+  description: "Đồ án Lập trình Web: quản lý lệnh sửa chữa, kho phụ tùng và thanh toán với Java Servlet.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -35,20 +21,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi">
       <body
-        className={`${jakartaSans.variable} ${jetbrainsMono.variable} font-sans antialiased bg-slate-50 text-slate-900 min-h-screen selection:bg-amber-100 selection:text-amber-900`}
+        className="antialiased bg-slate-50 text-slate-900 min-h-screen selection:bg-amber-100 selection:text-amber-900"
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          forcedTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster richColors position="top-right" />
-        </ThemeProvider>
+        {children}
       </body>
     </html>
   );

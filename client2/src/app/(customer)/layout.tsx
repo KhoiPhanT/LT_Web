@@ -1,19 +1,3 @@
-import React from "react";
-import { CustomerNavbar } from "@/components/layout/customer-navbar";
-import { PublicFooter } from "@/components/layout/public-footer";
-
-export default function CustomerLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col min-h-screen bg-brand-light dark:bg-brand-dark transition-colors">
-      <CustomerNavbar />
-      <main className="flex-1 py-4 sm:py-8 px-3 sm:px-6 max-w-6xl mx-auto w-full">
-        {children}
-      </main>
-      <PublicFooter />
-    </div>
-  );
-}
+// Phụ trách phần mới: Lợi. Khung cổng khách hàng.
+import { SimpleNav } from "@/components/layout/simple-nav";
+export default function CustomerLayout({children}:{children:React.ReactNode}) { return <div className="min-h-screen bg-slate-50"><SimpleNav role="CUSTOMER"/><main className="max-w-6xl mx-auto p-4 sm:p-8">{children}</main></div>; }

@@ -6,6 +6,8 @@
          version="6.0">
 
     <display-name>HiHiHaHa Auto Backend 2 (Servlet Engine)</display-name>
-    <description>RESTful API Engine chạy trên Jakarta Servlet và MySQL</description>
+    <description>API gara tinh gọn chạy trên Jakarta Servlet và MySQL</description>
+    <!-- Lợi: cấu hình phiên cookie cho đăng nhập nhân viên và khách OTP. -->
+    <session-config><session-timeout>720</session-timeout><tracking-mode>COOKIE</tracking-mode></session-config>
 
 </web-app>

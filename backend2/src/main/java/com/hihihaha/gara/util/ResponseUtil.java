@@ -1,7 +1,6 @@
 package com.hihihaha.gara.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
@@ -9,12 +8,9 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Tiện ích JSON có sẵn; Lợi phụ trách tích hợp và kiểm tra định dạng lỗi cho API Servlet mới. */
 public class ResponseUtil {
     private static final ObjectMapper mapper = new ObjectMapper();
-
-    static {
-        mapper.registerModule(new JavaTimeModule());
-    }
 
     public static void sendSuccess(HttpServletResponse response, Object data, String message, int statusCode) throws IOException {
         response.setContentType("application/json;charset=UTF-8");

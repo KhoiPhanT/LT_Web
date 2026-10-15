@@ -1,58 +1,41 @@
 package com.hihihaha.gara.servlet;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.hihihaha.gara.dao.PartDAO;
-import com.hihihaha.gara.model.Part;
-import com.hihihaha.gara.util.ResponseUtil;
+import com.hihihaha.gara.dao.InventoryDAO;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.List;
+import java.sql.SQLException;
 
+/** Phụ trách phần mới: Tân. Quản lý danh mục và tồn kho phụ tùng dùng cho dịch vụ. */
 @WebServlet("/api/v1/inventory/*")
-public class InventoryServlet extends HttpServlet {
-    private final PartDAO partDAO = new PartDAO();
-
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        String pathInfo = req.getPathInfo();
-        if (pathInfo != null && pathInfo.length() > 1) {
-            int id = Integer.parseInt(pathInfo.substring(1));
-            Part p = partDAO.getById(id);
-            if (p != null) {
-                ResponseUtil.sendSuccess(resp, p);
-            } else {
-                ResponseUtil.sendError(resp, "Không tìm thấy phụ tùng", HttpServletResponse.SC_NOT_FOUND);
-            }
-            return;
-        }
-
-        List<Part> list = partDAO.getAll();
-        ResponseUtil.sendSuccess(resp, list);
+public class InventoryServlet extends ServletSupport {
+    private final InventoryDAO dao=new InventoryDAO();
+    @Override protected void doGet(HttpServletRequest req,HttpServletResponse resp) throws IOException {
+        if("CUSTOMER".equals(role(req))) { err(resp,403,"Không có quyền xem kho"); return; }
+        try { ok(resp,dao.all()); } catch(SQLException e) { err(resp,503,"Không đọc được kho"); }
     }
-
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        JsonNode body = ResponseUtil.getMapper().readTree(req.getInputStream());
-
-        Part p = new Part();
-        p.setPartCode(body.has("part_code") ? body.get("part_code").asText() : "PART-" + System.currentTimeMillis() % 10000);
-        p.setPartName(body.has("part_name") ? body.get("part_name").asText() : "Phụ tùng mới");
-        p.setCategory(body.has("category") ? body.get("category").asText() : "LUBRICANT");
-        p.setUnit(body.has("unit") ? body.get("unit").asText() : "Cái");
-        p.setPrice(body.has("price") ? BigDecimal.valueOf(body.get("price").asDouble()) : BigDecimal.ZERO);
-        p.setStockQuantity(body.has("stock_quantity") ? body.get("stock_quantity").asInt() : 10);
-        p.setLocationBin(body.has("location_bin") ? body.get("location_bin").asText() : "KHO-A1");
-
-        boolean ok = partDAO.create(p);
-        if (ok) {
-            ResponseUtil.sendSuccess(resp, p, "Thêm phụ tùng mới thành công", HttpServletResponse.SC_CREATED);
-        } else {
-            ResponseUtil.sendError(resp, "Thêm phụ tùng thất bại (Trùng mã phụ tùng)", HttpServletResponse.SC_BAD_REQUEST);
-        }
+    @Override protected void doPost(HttpServletRequest req,HttpServletResponse resp) throws IOException {
+        if(!allow(req,resp,"MANAGER")) return;
+        JsonNode b; try { b=body(req); } catch(Exception e) { err(resp,400,"JSON không hợp lệ"); return; }
+        String code=str(b,"part_code"), name=str(b,"part_name"), unit=str(b,"unit");
+        BigDecimal price; int stock;
+        try { price=new BigDecimal(str(b,"price")); stock=Math.toIntExact(num(b,"stock_quantity")); } catch(Exception e) { err(resp,400,"Giá hoặc số lượng không hợp lệ"); return; }
+        if(code.isBlank()||name.isBlank()||unit.isBlank()||price.signum()<0||stock<0) { err(resp,400,"Thiếu thông tin hoặc số âm"); return; }
+        try { created(resp,dao.create(code,name,unit,price,stock)); }
+        catch(SQLException e) { err(resp,"23000".equals(e.getSQLState())?409:503,"Không thêm được phụ tùng hoặc trùng mã"); }
+    }
+    @Override protected void doPatch(HttpServletRequest req,HttpServletResponse resp) throws IOException {
+        if(!allow(req,resp,"MANAGER")) return;
+        String path=req.getPathInfo();
+        if(path==null || !path.matches("/\\d+/stock")) { err(resp,404,"Endpoint không tồn tại"); return; }
+        JsonNode b; try { b=body(req); } catch(Exception e) { err(resp,400,"JSON không hợp lệ"); return; }
+        long id;
+        try { id=Long.parseLong(path.split("/")[1]); } catch(NumberFormatException e) { err(resp,400,"ID phụ tùng không hợp lệ"); return; }
+        long n=num(b,"stock_quantity"); if(n<0||n>Integer.MAX_VALUE) { err(resp,400,"Tồn kho không hợp lệ"); return; }
+        try { var p=dao.setStock(id,(int)n); if(p==null) err(resp,404,"Không thấy phụ tùng"); else ok(resp,p); }
+        catch(SQLException e) { err(resp,503,"Không cập nhật được kho"); }
     }
 }

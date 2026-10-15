@@ -1,10 +1,10 @@
+# Khởi: đóng gói Servlet thành WAR; Lợi: triển khai WAR trên Tomcat cho luồng OTP/thanh toán.
 # Stage 1: Build source code bằng Maven
 FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn -q clean package
 
 # Stage 2: Deploy ứng dụng lên Apache Tomcat 10
 FROM tomcat:10.1-jdk21-temurin

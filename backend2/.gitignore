@@ -1,5 +1,8 @@
 target/
 bin/
+data/
+__pycache__/
+*.pyc
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -31,3 +34,4 @@ bin/
 
 ### Log & Temp ###
 *.log
+email.properties

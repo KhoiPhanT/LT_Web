@@ -1,159 +1,103 @@
 package com.hihihaha.gara.servlet;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.hihihaha.gara.dao.CustomerDAO;
-import com.hihihaha.gara.dao.UserDAO;
-import com.hihihaha.gara.dao.VehicleDAO;
-import com.hihihaha.gara.model.Customer;
-import com.hihihaha.gara.model.User;
-import com.hihihaha.gara.model.Vehicle;
-import com.hihihaha.gara.util.ResponseUtil;
+import com.hihihaha.gara.config.DBContext;
+import com.hihihaha.gara.util.EmailService;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.HttpSession;
+import org.mindrot.jbcrypt.BCrypt;
 import java.io.IOException;
-import java.util.HashMap;
+import java.security.SecureRandom;
+import java.sql.*;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+/** Phụ trách phần mới: Lợi. Đăng nhập nhân viên và OTP email của khách hàng. */
 @WebServlet("/api/v1/auth/*")
-public class AuthServlet extends HttpServlet {
-    private final UserDAO userDAO = new UserDAO();
-    private final CustomerDAO customerDAO = new CustomerDAO();
-    private final VehicleDAO vehicleDAO = new VehicleDAO();
+public class AuthServlet extends ServletSupport {
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final ConcurrentHashMap<String, Otp> OTPS = new ConcurrentHashMap<>();
+    // Lợi: mặc định 5 phút; biến môi trường cho phép kiểm thử hết hạn mà không phải chờ 5 phút.
+    private static final long TTL = otpTtl();
+    private static long otpTtl() {
+        try { return Math.max(1_000L, Long.parseLong(System.getenv().getOrDefault("OTP_TTL_MS", "300000"))); }
+        catch (NumberFormatException e) { return 300000L; }
+    }
+    private record Otp(String code, long sentAt, long customerId, int attempts) {}
+    private static String plate(String value) { return value.replaceAll("\\s+", "").toUpperCase(); }
 
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        String pathInfo = req.getPathInfo();
-        if (pathInfo == null) pathInfo = "";
-
-        if (pathInfo.equals("/customer-lookup")) {
-            String plate = req.getParameter("license_plate");
-            String phone = req.getParameter("phone_number");
-            if (plate == null || phone == null) {
-                ResponseUtil.sendError(resp, "Thiếu biển số xe hoặc số điện thoại", HttpServletResponse.SC_BAD_REQUEST);
-                return;
+    // Lợi: trả tên mới nhất từ MySQL; localStorage cũ chỉ là cache hiển thị.
+    @Override protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        if (!"/me".equals(req.getPathInfo())) { err(resp,404,"Endpoint không tồn tại"); return; }
+        String currentRole=role(req);
+        String table="CUSTOMER".equals(currentRole)?"customers":"users";
+        try (Connection c=DBContext.getConnection(); PreparedStatement ps=c.prepareStatement("SELECT full_name,phone_number FROM "+table+" WHERE id=?")) {
+            ps.setLong(1,userId(req));
+            try (ResultSet rs=ps.executeQuery()) {
+                if (!rs.next()) { req.getSession(false).invalidate(); err(resp,401,"Phiên không còn hợp lệ"); return; }
+                Map<String,Object> user=new LinkedHashMap<>();
+                user.put("id",userId(req)); user.put("role",currentRole);
+                user.put("full_name",rs.getString("full_name")); user.put("phone_number",rs.getString("phone_number"));
+                if ("CUSTOMER".equals(currentRole)) user.put("license_plate",req.getSession(false).getAttribute("license_plate"));
+                ok(resp,user);
             }
-
-            Vehicle v = vehicleDAO.findByPlate(plate);
-            Customer c = customerDAO.findByPhone(phone);
-            if (v != null && c != null && v.getCustomerId() == c.getId()) {
-                Map<String, Object> data = new HashMap<>();
-                data.put("found", true);
-                data.put("full_name", c.getFullName());
-                data.put("email", c.getEmail());
-                data.put("has_email", c.getEmail() != null);
-                data.put("vehicle_model", v.getBrand() + " " + v.getModel());
-                ResponseUtil.sendSuccess(resp, data, "Tìm thấy hồ sơ khách hàng", HttpServletResponse.SC_OK);
-            } else {
-                Map<String, Object> data = new HashMap<>();
-                data.put("found", false);
-                data.put("message", "Không tìm thấy hồ sơ xe gắn với số điện thoại này");
-                ResponseUtil.sendSuccess(resp, data, "Không tìm thấy hồ sơ", HttpServletResponse.SC_OK);
-            }
-            return;
-        }
-
-        ResponseUtil.sendError(resp, "Endpoint không hợp lệ", HttpServletResponse.SC_NOT_FOUND);
+        } catch(SQLException e) { err(resp,503,"Không đọc được phiên đăng nhập"); }
     }
 
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        String pathInfo = req.getPathInfo();
-        if (pathInfo == null) pathInfo = "";
-
-        JsonNode body = ResponseUtil.getMapper().readTree(req.getInputStream());
-
-        if (pathInfo.equals("/login")) {
-            String username = body.has("username") ? body.get("username").asText() : "";
-            String password = body.has("password") ? body.get("password").asText() : "";
-
-            User user = userDAO.login(username, password);
-            if (user != null) {
-                sendUserToken(resp, user);
-            } else {
-                ResponseUtil.sendError(resp, "Tên đăng nhập hoặc mật khẩu không chính xác", HttpServletResponse.SC_UNAUTHORIZED);
-            }
-            return;
-        }
-
-        if (pathInfo.equals("/pin-login")) {
-            String pinCode = body.has("pin_code") ? body.get("pin_code").asText() : "";
-            User user = userDAO.loginByPin(pinCode);
-            if (user != null) {
-                sendUserToken(resp, user);
-            } else {
-                ResponseUtil.sendError(resp, "Mã PIN không chính xác", HttpServletResponse.SC_UNAUTHORIZED);
-            }
-            return;
-        }
-
-        // OTP Request (Khách hàng)
-        if (pathInfo.equals("/otp/request") || pathInfo.equals("/request-otp")) {
-            String plate = body.has("license_plate") ? body.get("license_plate").asText() : "";
-            String phone = body.has("phone_number") ? body.get("phone_number").asText() : "";
-
-            Vehicle v = vehicleDAO.findByPlate(plate);
-            Customer c = customerDAO.findByPhone(phone);
-            if (v != null && c != null) {
-                Map<String, Object> data = new HashMap<>();
-                data.put("message", "Mã OTP đã được gửi về email của bạn (Mã test: 123456)");
-                data.put("otp_preview", "123456");
-                ResponseUtil.sendSuccess(resp, data, "Gửi OTP thành công", HttpServletResponse.SC_OK);
-            } else {
-                ResponseUtil.sendError(resp, "Không tìm thấy hồ sơ xe gắn với số điện thoại này", HttpServletResponse.SC_NOT_FOUND);
-            }
-            return;
-        }
-
-        // OTP Verify (Khách hàng)
-        if (pathInfo.equals("/otp/verify") || pathInfo.equals("/verify-otp")) {
-            String plate = body.has("license_plate") ? body.get("license_plate").asText() : "";
-            String phone = body.has("phone_number") ? body.get("phone_number").asText() : "";
-            String otp = body.has("otp_code") ? body.get("otp_code").asText() : "";
-
-            // Chấp nhận mã OTP '123456' hoặc bất kỳ cho mô hình đơn giản
-            if ("123456".equals(otp) || otp.length() == 6) {
-                Customer c = customerDAO.findByPhone(phone);
-                if (c == null) {
-                    c = new Customer(1, "Khách hàng", phone, "customer@hihihaha.vn", "");
+    @Override protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String path=req.getPathInfo();
+        if ("/logout".equals(path)) { HttpSession s=req.getSession(false); if(s!=null) s.invalidate(); ok(resp,Map.of()); return; }
+        JsonNode b;
+        try { b=body(req); if (b==null || !b.isObject()) throw new IOException(); }
+        catch (Exception e) { err(resp,400,"JSON không hợp lệ"); return; }
+        if ("/staff-login".equals(path)) {
+            String phone=str(b,"phone_number"), pass=str(b,"password");
+            try (Connection c=DBContext.getConnection(); PreparedStatement ps=c.prepareStatement("SELECT id,full_name,password_hash,role FROM users WHERE phone_number=?")) {
+                ps.setString(1,phone);
+                try (ResultSet rs=ps.executeQuery()) {
+                    if (!rs.next() || !BCrypt.checkpw(pass,rs.getString("password_hash"))) { err(resp,401,"Sai số điện thoại hoặc mật khẩu"); return; }
+                    HttpSession s=newSession(req); s.setAttribute("role",rs.getString("role")); s.setAttribute("user_id",rs.getLong("id"));
+                    ok(resp,Map.of("user",Map.of("id",rs.getLong("id"),"role",rs.getString("role"),"full_name",rs.getString("full_name"),"phone_number",phone)));
                 }
-                Map<String, Object> userData = new HashMap<>();
-                userData.put("id", c.getId());
-                userData.put("full_name", c.getFullName());
-                userData.put("phone_number", c.getPhoneNumber());
-                userData.put("email", c.getEmail());
-                userData.put("role", "CUSTOMER");
-                userData.put("license_plate", plate);
-
-                Map<String, Object> result = new HashMap<>();
-                result.put("token", "cust_jwt_" + System.currentTimeMillis());
-                result.put("user", userData);
-
-                ResponseUtil.sendSuccess(resp, result, "Đăng nhập khách hàng thành công", HttpServletResponse.SC_OK);
-            } else {
-                ResponseUtil.sendError(resp, "Mã OTP không hợp lệ", HttpServletResponse.SC_BAD_REQUEST);
-            }
+            } catch(SQLException e) { err(resp,503,"Không kết nối được CSDL"); }
             return;
         }
-
-        ResponseUtil.sendError(resp, "Endpoint không hợp lệ", HttpServletResponse.SC_NOT_FOUND);
+        if ("/request-otp".equals(path)) {
+            String phone=str(b,"phone_number"), p=plate(str(b,"license_plate")), key=phone+":"+p;
+            Otp previous=OTPS.get(key); long now=System.currentTimeMillis();
+            if(previous!=null && now-previous.sentAt()<60_000L) { err(resp,429,"Vui lòng chờ 60 giây"); return; }
+            try (Connection c=DBContext.getConnection(); PreparedStatement ps=c.prepareStatement("SELECT c.id,c.email,c.full_name FROM customers c JOIN vehicles v ON v.customer_id=c.id WHERE c.phone_number=? AND v.license_plate=?")) {
+                ps.setString(1,phone); ps.setString(2,p);
+                try (ResultSet rs=ps.executeQuery()) {
+                    if (!rs.next() || rs.getString("email")==null || rs.getString("email").isBlank()) { err(resp,404,"Không tìm thấy hồ sơ có email"); return; }
+                    String email=rs.getString("email"), code=String.format("%06d",RANDOM.nextInt(1_000_000));
+                    boolean demo="true".equalsIgnoreCase(System.getenv("DEMO_MODE"));
+                    if(!demo) {
+                        try { EmailService.sendOtpEmail(email,rs.getString("full_name"),p,code); }
+                        catch(Exception e) { err(resp,503,"Không gửi được email OTP"); return; }
+                    }
+                    OTPS.put(key,new Otp(code,now,rs.getLong("id"),0));
+                    ok(resp,demo ? Map.of("masked_email",mask(email),"otp_preview",code) : Map.of("masked_email",mask(email)));
+                }
+            } catch(SQLException e) { err(resp,503,"Không kết nối được CSDL"); }
+            return;
+        }
+        if ("/verify-otp".equals(path)) {
+            String phone=str(b,"phone_number"), p=plate(str(b,"license_plate")), key=phone+":"+p, code=str(b,"otp_code");
+            Otp entry=OTPS.get(key);
+            if(entry==null || System.currentTimeMillis()-entry.sentAt()>TTL) { OTPS.remove(key); err(resp,400,"OTP đã hết hạn"); return; }
+            if(entry.attempts()>=5) { OTPS.remove(key); err(resp,429,"Đã thử quá số lần cho phép"); return; }
+            if(!entry.code().equals(code)) { OTPS.replace(key,entry,new Otp(entry.code(),entry.sentAt(),entry.customerId(),entry.attempts()+1)); err(resp,400,"OTP không đúng"); return; }
+            OTPS.remove(key);
+            HttpSession s=newSession(req); s.setAttribute("role","CUSTOMER"); s.setAttribute("user_id",entry.customerId()); s.setAttribute("license_plate",p);
+            ok(resp,Map.of("user",Map.of("id",entry.customerId(),"role","CUSTOMER","phone_number",phone,"license_plate",p)));
+            return;
+        }
+        err(resp,404,"Endpoint không tồn tại");
     }
-
-    private void sendUserToken(HttpServletResponse resp, User user) throws IOException {
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("id", user.getId());
-        userData.put("username", user.getUsername());
-        userData.put("full_name", user.getFullName());
-        userData.put("phone_number", user.getPhoneNumber());
-        userData.put("email", user.getEmail());
-        userData.put("role", user.getRole());
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", "staff_jwt_" + user.getId() + "_" + System.currentTimeMillis());
-        result.put("user", userData);
-
-        ResponseUtil.sendSuccess(resp, result, "Đăng nhập thành công", HttpServletResponse.SC_OK);
-    }
+    private static HttpSession newSession(HttpServletRequest req) { HttpSession old=req.getSession(false); if(old!=null) old.invalidate(); HttpSession s=req.getSession(true); s.setMaxInactiveInterval(12*60*60); return s; }
+    private static String mask(String email) { int i=email.indexOf('@'); return i>1 ? email.charAt(0)+"***"+email.substring(i) : "***"; }
 }

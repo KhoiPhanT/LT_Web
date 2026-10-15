@@ -1,22 +1,12 @@
 @echo off
-chcp 65001 >nul
-echo ===================================================
-echo   DANG KHOI DONG BACKEND 2 (JAVA SERVER - PORT 8089)
-echo   DATABASE MYSQL DOCKER (PORT 3307)
-echo ===================================================
-cd /d "%~dp0backend2"
-
-set PORT=8089
-set DB_PORT=3307
-
-if not exist "bin" mkdir bin
-echo Dang bien dich source code Java...
-javac -encoding UTF-8 -d bin src\main\java\com\hihihaha\gara\AppServer.java
-
-if %ERRORLEVEL% equ 0 (
-    echo [OK] Bien dich thanh cong! Dang khoi chay server tai port 8089...
-    java -cp bin com.hihihaha.gara.AppServer
-) else (
-    echo [LOI] Bien dich that bai! Vui long kiem tra JDK 21.
-    pause
-)
+rem Khởi: nạp seed MySQL; Lợi: khởi động Servlet và cấu hình OTP trên Windows.
+setlocal
+cd /d "%~dp0"
+docker compose up -d --wait mysql_db
+if errorlevel 1 exit /b 1
+docker compose exec -T mysql_db sh -c "MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql --default-character-set=utf8mb4 -uroot" < backend2\src\main\resources\database\init.sql
+if errorlevel 1 exit /b 1
+docker compose up -d --build --wait backend2_servlet
+if errorlevel 1 exit /b 1
+if "%BACKEND_HOST_PORT%"=="" set BACKEND_HOST_PORT=8089
+echo Servlet API: http://localhost:%BACKEND_HOST_PORT%/api/v1/health
