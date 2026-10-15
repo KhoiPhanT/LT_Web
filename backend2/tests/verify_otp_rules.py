@@ -4,6 +4,7 @@
 Start a separate Docker project with DEMO_MODE=true and OTP_TTL_MS=1200, apply init.sql,
 then set GARA_API_BASE to that project's backend URL before running this file.
 """
+
 import json
 import os
 import time
@@ -17,8 +18,12 @@ BASE = os.environ.get("GARA_API_BASE", "http://127.0.0.1:18089/api/v1")
 
 
 def call(path, data):
-    request = urllib.request.Request(BASE + path, data=json.dumps(data).encode(),
-                                     headers={"Content-Type": "application/json"}, method="POST")
+    request = urllib.request.Request(
+        BASE + path,
+        data=json.dumps(data).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             return response.status, json.load(response)

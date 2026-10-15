@@ -4,7 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HiHiHaHa Auto | Quản lý gara",
-  description: "Đồ án Lập trình Web: quản lý lệnh sửa chữa, kho phụ tùng và thanh toán với Java Servlet.",
+  description:
+    "Đồ án Lập trình Web: quản lý lệnh sửa chữa, kho phụ tùng và thanh toán với Java Servlet.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -22,9 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body
-        className="antialiased bg-slate-50 text-slate-900 min-h-screen selection:bg-amber-100 selection:text-amber-900"
-      >
+      <body className="antialiased bg-slate-50 text-slate-900 min-h-screen selection:bg-amber-100 selection:text-amber-900">
         {children}
       </body>
     </html>
