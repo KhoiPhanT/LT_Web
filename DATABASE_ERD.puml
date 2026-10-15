@@ -1,77 +1,109 @@
 @startuml
-' Phụ trách phần mới: Khởi (quan hệ lệnh), Tân (kho/dịch vụ), Kiệt (tiến độ), Lợi (hóa đơn).
-title HiHiHaHa Auto - 8 bảng MySQL demo
-entity users { * id : BIGINT
+' ERD theo backend2/src/main/resources/database/init.sql.
+' Phụ trách phần mới: Khởi (khách, xe, lệnh, hạng mục), Tân (kho, dịch vụ), Kiệt (tiến độ), Lợi (hóa đơn).
+title HiHiHaHa Auto - ERD MySQL (8 bảng)
+hide circle
+skinparam linetype ortho
+skinparam backgroundColor #FFFFFF
+skinparam entityBorderColor #334155
+skinparam entityFontColor #0F172A
+skinparam ArrowColor #64748B
+skinparam Shadowing false
+' Màu nền từng bảng: tím = tài khoản, vàng = tiếp nhận/lệnh,
+' xanh lá = kho/dịch vụ, xanh dương = hạng mục/tiến độ, hồng = hóa đơn.
+
+entity "users" as users #EDE9FE {
+  * id : BIGINT <<PK>>
   --
-  full_name : VARCHAR
-  phone_number : VARCHAR <<unique>>
-  password_hash : VARCHAR
-  role : MANAGER/TECHNICIAN
+  * full_name : VARCHAR(100)
+  * phone_number : VARCHAR(20) <<UQ>>
+  * password_hash : VARCHAR(100)
+  * role : ENUM(MANAGER, TECHNICIAN)
 }
-entity customers { * id : BIGINT
+entity "customers" as customers #FEF3C7 {
+  * id : BIGINT <<PK>>
   --
-  full_name : VARCHAR
-  phone_number : VARCHAR <<unique>>
-  email : VARCHAR
+  * full_name : VARCHAR(100)
+  * phone_number : VARCHAR(20) <<UQ>>
+  * email : VARCHAR(150)
 }
-entity vehicles { * id : BIGINT
+entity "vehicles" as vehicles #FEF3C7 {
+  * id : BIGINT <<PK>>
   --
-  customer_id : BIGINT
-  license_plate : VARCHAR <<unique>>
-  model : VARCHAR
+  * customer_id : BIGINT <<FK>>
+  * license_plate : VARCHAR(30) <<UQ>>
+  * model : VARCHAR(100)
 }
-entity parts { * id : BIGINT
+entity "parts" as parts #DCFCE7 {
+  * id : BIGINT <<PK>>
   --
-  part_code : VARCHAR <<unique>>
-  part_name : VARCHAR
-  unit : VARCHAR
-  price : DECIMAL
-  stock_quantity : INT
+  * part_code : VARCHAR(50) <<UQ>>
+  * part_name : VARCHAR(150)
+  * unit : VARCHAR(30)
+  * price : DECIMAL(12,2)
+  * stock_quantity : INT
 }
-entity services { * id : BIGINT
+entity "services" as services #DCFCE7 {
+  * id : BIGINT <<PK>>
   --
-  service_code : VARCHAR <<unique>>
-  service_name : VARCHAR
-  labor_price : DECIMAL
-  default_part_id : BIGINT (nullable)
-  default_part_quantity : INT
+  * service_code : VARCHAR(60) <<UQ>>
+  * service_name : VARCHAR(150)
+  * labor_price : DECIMAL(12,2)
+  default_part_id : BIGINT <<FK, NULL>>
+  * default_part_quantity : INT
 }
-entity work_orders { * id : BIGINT
+entity "work_orders" as work_orders #FEF3C7 {
+  * id : BIGINT <<PK>>
   --
-  order_code : VARCHAR <<unique>>
-  vehicle_id : BIGINT
-  created_by : BIGINT
-  assigned_to : BIGINT
-  status : ENUM
-  assigned_at : TIMESTAMP
-  finished_at : TIMESTAMP
-  stock_deducted_at : TIMESTAMP
+  * order_code : VARCHAR(50) <<UQ>>
+  * vehicle_id : BIGINT <<FK>>
+  * created_by : BIGINT <<FK>>
+  assigned_to : BIGINT <<FK, NULL>>
+  symptoms : TEXT <<NULL>>
+  * status : ENUM(RECEIVED, IN_PROGRESS, WAITING_PAYMENT, COMPLETED)
+  * total_amount : DECIMAL(12,2)
+  * created_at : TIMESTAMP
+  assigned_at : TIMESTAMP <<NULL>>
+  finished_at : TIMESTAMP <<NULL>>
+  stock_deducted_at : TIMESTAMP <<NULL>>
 }
-entity work_order_items { * id : BIGINT
+entity "work_order_items" as work_order_items #DBEAFE {
+  * id : BIGINT <<PK>>
   --
-  work_order_id : BIGINT
-  part_id : BIGINT (nullable)
-  service_id : BIGINT (nullable)
-  item_type : PART/LABOR
-  progress_percent : 0/50/100
-  quantity : INT
-  unit_price : DECIMAL
+  * work_order_id : BIGINT <<FK>>
+  part_id : BIGINT <<FK, NULL>>
+  service_id : BIGINT <<FK, NULL>>
+  * item_type : ENUM(PART, LABOR)
+  * item_name : VARCHAR(150)
+  * quantity : INT
+  * unit_price : DECIMAL(12,2)
+  * total_price : DECIMAL(12,2)
+  * progress_percent : TINYINT
 }
-entity invoices { * id : BIGINT
+entity "invoices" as invoices #FCE7F3 {
+  * id : BIGINT <<PK>>
   --
-  work_order_id : BIGINT <<unique>>
-  amount : DECIMAL
-  payment_status : ENUM
-  reported_at : TIMESTAMP
-  paid_at : TIMESTAMP
+  * work_order_id : BIGINT <<FK, UQ>>
+  * amount : DECIMAL(12,2)
+  * payment_status : ENUM(UNPAID, PENDING_VERIFICATION, PAID)
+  * payment_method : VARCHAR(20)
+  reported_at : TIMESTAMP <<NULL>>
+  paid_at : TIMESTAMP <<NULL>>
 }
-customers ||--o{ vehicles
-vehicles ||--o{ work_orders
+
+customers ||--o{ vehicles : owns
+vehicles ||--o{ work_orders : receives
 users ||--o{ work_orders : created_by
 users |o--o{ work_orders : assigned_to
-work_orders ||--o{ work_order_items
-parts |o--o{ work_order_items
-parts |o--o{ services : default_part
-services |o--o{ work_order_items
-work_orders ||--|| invoices
+work_orders ||--o{ work_order_items : contains
+parts |o--o{ services : default_part_id
+parts |o--o{ work_order_items : part_id
+services |o--o{ work_order_items : service_id
+work_orders ||--o| invoices : billed_by
+
+note bottom of work_order_items
+  One service can produce a LABOR row and an optional PART row.
+  item_name and prices are snapshots when the order is created.
+  The database allows nullable part_id and service_id for historical rows.
+end note
 @enduml
