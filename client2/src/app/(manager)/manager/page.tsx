@@ -6,7 +6,9 @@ import { api, orderStatusLabel, paymentStatusLabel, TechnicianReport, WorkOrder 
 function inputDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+// Khởi: trang /manager ghép danh sách lệnh với báo cáo theo ngày để quản lý điều phối.
 export default function ManagerPage() {
+  // Khởi: orders là lệnh từ MySQL; stats là số lệnh giao/xong theo từng thợ.
   const [orders, setOrders] = useState<WorkOrder[]>([]),
     [stats, setStats] = useState<TechnicianReport[]>([]),
     [error, setError] = useState("");
@@ -16,7 +18,7 @@ export default function ManagerPage() {
       return inputDate(date);
     }),
     [to, setTo] = useState(() => inputDate(new Date()));
-  // Khởi: lấy danh sách lệnh, kỹ thuật viên và số liệu hiệu suất theo ngày.
+  // Khởi: tải lại cả danh sách lệnh và báo cáo; from/to đổi thì báo cáo được tính lại.
   const load = useCallback(() => {
     api
       .getOrders()
@@ -27,10 +29,12 @@ export default function ManagerPage() {
       .then(setStats)
       .catch((e) => setError(e.message));
   }, [from, to]);
+  // Khởi: gọi load lúc mở trang và sau khi khoảng ngày thay đổi.
   useEffect(() => {
     load();
   }, [load]);
-  // Khởi: quản lý phân công kỹ thuật viên cho lệnh vừa tiếp nhận.
+  // Khởi: khi chọn thợ trong dòng lệnh RECEIVED, gửi mã lệnh + ID thợ đến AssignmentServlet.
+  // Thành công thì tải lại để thấy người được giao và thời điểm phân công từ MySQL.
   async function assign(code: string, id: number) {
     if (!id) return;
     setError("");
@@ -41,7 +45,7 @@ export default function ManagerPage() {
       setError((e as Error).message);
     }
   }
-  // Lợi: chỉ quản lý dùng API đối soát để xác nhận đã nhận tiền.
+  // Lợi: sau khi ngân hàng đã nhận tiền, quản lý xác nhận để PaymentServlet đặt hóa đơn PAID.
   async function verify(code: string) {
     setError("");
     try {

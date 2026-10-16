@@ -3,17 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+// Lợi: trang /staff/login là điểm vào chung của quản lý và kỹ thuật viên.
 export default function StaffLogin() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Lợi: gửi thông tin đăng nhập tới AuthServlet; role trả về quyết định trang tiếp theo.
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
+      // Backend đối chiếu mật khẩu và tạo session cookie; frontend không tự cấp quyền.
       const user = await api.staffLogin(phone, password);
       router.push(user.role === "MANAGER" ? "/manager" : "/technician");
     } catch (e) {

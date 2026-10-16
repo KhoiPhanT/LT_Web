@@ -4,18 +4,25 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { api, WorkOrder, orderStatusLabel, paymentStatusLabel } from "@/lib/api";
+// Lợi: trang /customer/payment/[order_code] dùng mã lệnh trên URL để xem và báo thanh toán.
 export default function PaymentPage() {
+  // Lợi: /customer/payment/DEMO-001 -> params.order_code là "DEMO-001".
+  // Mã này là mã lệnh sửa chữa, không phải mã khách; backend vẫn kiểm tra session khi đọc.
   const params = useParams();
   const code = String(params.order_code || "");
+  // Lợi: order là dữ liệu trả từ MySQL; ban đầu null vì request chưa hoàn thành.
   const [order, setOrder] = useState<WorkOrder | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  // Lợi: khi mở trang hoặc code trong URL đổi, lấy chi tiết đúng lệnh để hiển thị tiền và trạng thái.
   useEffect(() => {
     api
       .getOrder(code)
       .then(setOrder)
       .catch((e) => setError(e.message));
   }, [code]);
+  // Lợi: nút "Đã chuyển khoản" chỉ báo cho backend chuyển sang chờ đối soát.
+  // Gọi GET lần nữa để giao diện nhận trạng thái mới; chỉ quản lý mới có quyền xác nhận PAID.
   async function report() {
     setBusy(true);
     setError("");
@@ -28,6 +35,7 @@ export default function PaymentPage() {
       setBusy(false);
     }
   }
+  // Lợi: số tiền và nội dung chuyển khoản lấy từ lệnh vừa tải, không lấy từ ô nhập của khách.
   const amount = Number(order?.total_amount || 0);
   const qrData = `https://img.vietqr.io/image/MB-0797526990-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(code)}`;
   return (

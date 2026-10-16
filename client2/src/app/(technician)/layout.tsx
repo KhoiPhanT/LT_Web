@@ -1,5 +1,6 @@
 // Phụ trách phần mới: Kiệt. Khung trang kỹ thuật viên.
 import { SimpleNav } from "@/components/layout/simple-nav";
+// Kiệt: các trang /technician dùng chung menu và vùng hiển thị nội dung.
 export default function TechnicianLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50">

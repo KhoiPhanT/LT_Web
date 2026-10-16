@@ -4,16 +4,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, clearSession, Role, UserSession } from "@/lib/api";
+// Tân: role do layout truyền vào để chọn nhóm link; Lợi: tên người dùng lấy lại từ session.
 export function SimpleNav({ role }: { role: Role }) {
   const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
-  // Lợi: xác minh phiên và thay tên cũ trong localStorage bằng dữ liệu MySQL hiện tại.
+  // Lợi: mỗi lần mở layout, gọi /auth/me để kiểm tra session và lấy tên mới nhất từ MySQL.
+  // localStorage không có quyền quyết định người dùng có được gọi API hay không.
   useEffect(() => {
     api
       .me()
       .then(setUser)
       .catch(() => setUser(null));
   }, []);
+  // Tân: chỉ hiện các trang còn dùng theo từng vai trò; đây là menu, không thay kiểm tra 403.
   const links =
     role === "MANAGER"
       ? [
@@ -52,6 +55,7 @@ export function SimpleNav({ role }: { role: Role }) {
         <button
           className="text-sm text-red-600"
           onClick={() => {
+            // Lợi: xóa cache giao diện, gọi Servlet hủy session rồi về đúng trang đăng nhập.
             clearSession();
             router.push(role === "CUSTOMER" ? "/login" : "/staff/login");
           }}

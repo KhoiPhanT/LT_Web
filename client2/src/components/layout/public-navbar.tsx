@@ -1,5 +1,6 @@
 // Phụ trách phần mới: Tân. Thanh điều hướng công khai.
 import Link from "next/link";
+// Tân: navbar công khai đưa khách và nhân viên đến hai cách đăng nhập khác nhau.
 export function PublicNavbar() {
   return (
     <header className="bg-white border-b">

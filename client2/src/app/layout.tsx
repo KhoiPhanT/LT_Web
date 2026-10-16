@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   },
 };
 
+// Tân: layout gốc bọc tất cả route; đặt ngôn ngữ tiếng Việt và CSS chung cho toàn site.
 export default function RootLayout({
   children,
 }: Readonly<{

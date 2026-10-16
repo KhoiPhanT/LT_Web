@@ -14,7 +14,9 @@ const emptyService = {
   default_part_quantity: "1",
 };
 
+// Tân: trang /manager/inventory quản lý hai danh mục độc lập: phụ tùng và dịch vụ.
 export default function InventoryPage() {
+  // Tân: parts/services là dữ liệu từ MySQL; hai form giữ giá trị đang nhập ở trình duyệt.
   const [parts, setParts] = useState<Part[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [partForm, setPartForm] = useState(emptyPart);
@@ -22,6 +24,7 @@ export default function InventoryPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Tân: lấy kho và dịch vụ cùng lúc; gọi lại sau mỗi thao tác ghi để hiện số liệu mới.
   async function reload() {
     try {
       const [partRows, serviceRows] = await Promise.all([api.inventory(), api.services()]);
@@ -31,10 +34,12 @@ export default function InventoryPage() {
       setMessage(cause instanceof Error ? cause.message : "Không tải được danh mục");
     }
   }
+  // Tân: tải danh mục lần đầu khi mở trang quản lý kho.
   useEffect(() => {
     void reload();
   }, []);
 
+  // Tân: form thêm phụ tùng gửi mã/tên/giá/tồn tới InventoryServlet rồi làm mới bảng.
   async function addPart(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -54,7 +59,8 @@ export default function InventoryPage() {
       setBusy(false);
     }
   }
-  // Tân: dịch vụ có thể chỉ có tiền công; nếu có vật tư, chọn mã kho và định mức dùng.
+  // Tân: form thêm dịch vụ gửi giá công tới ServiceServlet. Dịch vụ có thể không dùng vật tư;
+  // nếu dùng, default_part_id trỏ sang kho và default_part_quantity là định mức mỗi lần làm.
   async function addService(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -76,6 +82,7 @@ export default function InventoryPage() {
       setBusy(false);
     }
   }
+  // Tân: quản lý nhập tồn mới; kiểm tra số nguyên không âm trước khi PATCH xuống backend.
   async function editStock(part: Part) {
     const input = window.prompt(`Tồn kho mới của ${part.part_name}`, String(part.stock_quantity));
     if (input === null) return;
@@ -92,6 +99,7 @@ export default function InventoryPage() {
       setMessage(cause instanceof Error ? cause.message : "Không cập nhật được tồn kho");
     }
   }
+  // Tân: sửa tên/giá công niêm yết; lệnh đã lập vẫn giữ giá cũ trong work_order_items.
   async function editService(service: Service) {
     const name = window.prompt("Tên dịch vụ", service.service_name);
     if (name === null) return;

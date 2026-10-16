@@ -1,5 +1,6 @@
 // Phụ trách phần mới: Tân. Trang giới thiệu ngắn của bản tinh gọn.
 import Link from "next/link";
+// Tân: trang / giới thiệu hai đường đi: khách dùng OTP, nhân viên dùng mật khẩu.
 export default function HomePage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-16">

@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, WorkOrder, getCurrentUser, orderStatusLabel } from "@/lib/api";
 
+// Kiệt: trang /technician hiện lệnh của thợ và checklist tiến độ từng công việc.
 export default function TechnicianPage() {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [user, setUser] = useState<ReturnType<typeof getCurrentUser>>(null);
 
-  // Kiệt: lấy chi tiết của lệnh đang sửa để hiện checklist đã lưu trong MySQL.
+  // Kiệt: GET danh sách lệnh, sau đó GET chi tiết các lệnh đang sửa để lấy từng dòng LABOR.
+  // Danh sách và tiến độ đều đến từ MySQL, nên tải lại trang không mất kết quả đã lưu.
   async function load() {
     try {
       const rows = await api.getOrders();
@@ -27,11 +29,14 @@ export default function TechnicianPage() {
       setError(cause instanceof Error ? cause.message : "Không tải được lệnh");
     }
   }
+  // Kiệt: khi mở trang, đọc người đăng nhập để hiện nút đúng thợ rồi tải lệnh được phép xem.
   useEffect(() => {
     setUser(getCurrentUser());
     void load();
   }, []);
 
+  // Kiệt: nút "Bắt đầu"/"Hoàn thành" gọi ProgressServlet theo mã lệnh.
+  // finish=true chỉ được backend chấp nhận khi mọi việc LABOR đạt 100%, rồi trừ kho một lần.
   async function change(code: string, finish: boolean) {
     setError("");
     setBusy(code);
@@ -46,7 +51,8 @@ export default function TechnicianPage() {
     }
   }
 
-  // Kiệt: nút bấm đi 0 → 50 → 100; trước khi kết thúc có thể đưa về 0 để làm lại.
+  // Kiệt: nút của từng công việc đi 0 → 50 → 100 → 0, gửi itemId + mức mới tới backend.
+  // Sau khi PATCH thành công, load() đọc lại checklist để hiển thị tiến độ đã lưu.
   async function advance(code: string, itemId: number, current: number) {
     setError("");
     setBusy(`${code}-${itemId}`);

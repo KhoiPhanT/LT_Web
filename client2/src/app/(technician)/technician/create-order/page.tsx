@@ -7,8 +7,10 @@ import { api, Service, ServiceSelection } from "@/lib/api";
 
 const money = (value: number) => value.toLocaleString("vi-VN") + " ₫";
 
+// Khởi: trang /technician/create-order nhận xe, khách và nhiều dịch vụ trong một lệnh.
 export default function CreateOrder() {
   const router = useRouter();
+  // Tân: catalog là danh mục dịch vụ/giá từ MySQL, không phải giá do người lập lệnh tự nhập.
   const [catalog, setCatalog] = useState<Service[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,9 +23,11 @@ export default function CreateOrder() {
     symptoms: "",
   });
   const [services, setServices] = useState<ServiceSelection[]>([]);
+  // Khởi: serviceId/quantity là lựa chọn đang nhập; services là danh sách sẽ gửi khi lưu.
   const [serviceId, setServiceId] = useState("");
   const [quantity, setQuantity] = useState("1");
 
+  // Tân: mở trang thì tải dịch vụ niêm yết để thợ chọn trong form.
   useEffect(() => {
     api
       .services()
@@ -31,7 +35,7 @@ export default function CreateOrder() {
       .catch((cause) => setError(cause.message));
   }, []);
   const selected = catalog.find((service) => service.id === Number(serviceId));
-  // Khởi: đây là giá xem trước; Servlet luôn tính lại từ dữ liệu MySQL khi tạo lệnh.
+  // Khởi: cộng giá xem trước của các dịch vụ đã chọn; Servlet tính lại từ MySQL khi lưu.
   const estimate = services.reduce((sum, entry) => {
     const service = catalog.find((candidate) => candidate.id === entry.service_id);
     if (!service) return sum;
@@ -43,6 +47,7 @@ export default function CreateOrder() {
     );
   }, 0);
 
+  // Khởi: nút "Thêm" đưa một dịch vụ vào lệnh; chọn lại cùng dịch vụ thì cộng số lượng.
   function addService() {
     const count = Number(quantity);
     if (!selected || !Number.isInteger(count) || count <= 0 || count > 1000) {
@@ -68,6 +73,8 @@ export default function CreateOrder() {
     setError("");
   }
 
+  // Khởi: nút "Tạo lệnh" gửi khách, xe và mảng services trong một request tới WorkOrderServlet.
+  // Backend tạo work_orders, work_order_items và invoices trong cùng giao dịch MySQL.
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (services.length === 0) {

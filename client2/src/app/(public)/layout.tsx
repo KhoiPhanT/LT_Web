@@ -1,3 +1,4 @@
+// Tân: khung trang công khai; Next.js thay children bằng nội dung trang đang mở.
 import React from "react";
 import { PublicNavbar } from "@/components/layout/public-navbar";
 import { PublicFooter } from "@/components/layout/public-footer";

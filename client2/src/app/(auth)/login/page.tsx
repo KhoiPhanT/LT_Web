@@ -3,27 +3,33 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+// Lợi: trang /login cho khách xác minh biển số + điện thoại trước khi xem lệnh của mình.
 export default function CustomerLogin() {
   const router = useRouter();
+  // Lợi: các giá trị người dùng đang nhập; sent quyết định form đang ở bước gửi hay nhập OTP.
   const [plate, setPlate] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
   const [hint, setHint] = useState("");
   const [error, setError] = useState("");
+  // Lợi: busy khóa nút trong lúc request đang chạy để tránh gửi trùng.
   const [busy, setBusy] = useState(false);
+  // Lợi: cùng một form có hai lần submit: xin mã OTP, rồi xác thực mã vừa nhập.
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
       if (!sent) {
+        // AuthServlet tìm khách theo phone + plate và gửi mã tới email đã lưu.
         const data = await api.requestOtp(phone, plate);
         setSent(true);
         setHint(
           `Mã đã gửi đến ${data.masked_email}${data.otp_preview ? ` • Mã demo: ${data.otp_preview}` : ""}`,
         );
       } else {
+        // OTP đúng: Servlet tạo HttpSession; frontend chuyển sang danh sách lệnh của khách.
         await api.verifyOtp(phone, plate, otp);
         router.push("/customer");
       }
@@ -92,6 +98,7 @@ export default function CustomerLogin() {
         <button
           type="button"
           onClick={() => {
+            // Lợi: quay lại bước đầu để đổi biển số/điện thoại; OTP đang nhập bị xóa.
             setSent(false);
             setOtp("");
           }}

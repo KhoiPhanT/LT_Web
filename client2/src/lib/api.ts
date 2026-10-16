@@ -1,6 +1,8 @@
 // Phụ trách phần mới: Lợi (phiên, OTP, thanh toán), Khởi (lệnh, phân công, báo cáo), Tân (kho), Kiệt (tiến độ).
 // Cookie HttpSession do Tomcat cấp là nguồn quyền; localStorage chỉ lưu tên/role để hiển thị menu.
+// Trang gọi hàm trong api bên dưới -> request() gửi /api/v1 -> Next.js chuyển tới Servlet -> MySQL.
 export type Role = "MANAGER" | "TECHNICIAN" | "CUSTOMER";
+// Lợi: thông tin hiển thị sau đăng nhập; đây không phải nguồn quyền của backend.
 export type UserSession = {
   id: number;
   role: Role;
@@ -8,6 +10,7 @@ export type UserSession = {
   phone_number: string;
   license_plate?: string;
 };
+// Tân: một dòng kho phụ tùng gồm giá hiện tại và số lượng tồn hiện tại.
 export type Part = {
   id: number;
   part_code: string;
@@ -28,7 +31,10 @@ export type Service = {
   part_price: number | null;
   stock_quantity: number | null;
 };
+// Khởi: mỗi phần tử trong mảng services khi lập lệnh chỉ gửi ID dịch vụ và số lần làm.
+// Giá không nằm trong kiểu này vì WorkOrderServlet sẽ đọc giá niêm yết từ MySQL.
 export type ServiceSelection = { service_id: number; quantity: number };
+// Kiệt/Khởi: dòng công hoặc vật tư thuộc một lệnh; tiến độ chỉ áp dụng cho dòng công.
 export type OrderItem = {
   id?: number;
   part_id?: number | null;
@@ -40,6 +46,8 @@ export type OrderItem = {
   total_price?: number;
   progress_percent?: number;
 };
+// Khởi: dữ liệu lệnh mà trang khách, thợ và quản lý cùng sử dụng.
+// items chỉ có ở API chi tiết; API danh sách trả các trường tổng quan.
 export type WorkOrder = {
   order_code: string;
   license_plate: string;
@@ -54,6 +62,7 @@ export type WorkOrder = {
   payment_status: "UNPAID" | "PENDING_VERIFICATION" | "PAID";
   items?: OrderItem[];
 };
+// Khởi: một dòng báo cáo của kỹ thuật viên trong khoảng ngày quản lý đã chọn.
 export type TechnicianReport = {
   id: number;
   full_name: string;
@@ -74,6 +83,7 @@ export const paymentStatusLabel: Record<WorkOrder["payment_status"], string> = {
   PENDING_VERIFICATION: "Chờ đối soát",
   PAID: "Đã thanh toán",
 };
+// Lợi: cùng domain với giao diện; next.config.mjs chuyển đường dẫn này sang Tomcat.
 const BASE = "/api/v1";
 // Lợi: đọc thông tin chỉ để hiển thị; Servlet vẫn xác thực bằng HttpSession.
 export function getCurrentUser(): UserSession | null {
@@ -84,18 +94,19 @@ export function getCurrentUser(): UserSession | null {
     return null;
   }
 }
-// Lợi: lưu tên và vai trò cho menu sau khi Servlet tạo phiên.
+// Lợi: lưu tên và vai trò để menu hiển thị ngay sau đăng nhập; cookie mới là phiên thật.
 function saveUser(user: UserSession) {
   localStorage.setItem("gara_user", JSON.stringify(user));
 }
-// Lợi: đăng xuất trên cả trình duyệt và Servlet.
+// Lợi: xóa cache giao diện và báo AuthServlet hủy session trên server.
 export function clearSession() {
   if (typeof window !== "undefined") {
     localStorage.removeItem("gara_user");
     void fetch(`${BASE}/auth/logout`, { method: "POST", credentials: "same-origin" });
   }
 }
-// Lợi: mọi request dùng cùng cookie phiên; lỗi 401 xóa thông tin hiển thị cũ.
+// Lợi: hàm HTTP chung ghép BASE + path, tự gửi session cookie và đọc JSON trả về.
+// API thành công có dạng { data: ... }; API lỗi có message, chuyển thành Error cho trang hiển thị.
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     ...init,
@@ -118,25 +129,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   return result.data as T;
 }
-// Lợi: helper HTTP dùng chung cho các luồng tạo và cập nhật dữ liệu.
+// Lợi: hai helper đóng gói dữ liệu thành JSON cho các thao tác tạo (POST) và sửa (PATCH).
 const post = <T>(path: string, data: unknown) =>
   request<T>(path, { method: "POST", body: JSON.stringify(data) });
 const patch = <T>(path: string, data: unknown) =>
   request<T>(path, { method: "PATCH", body: JSON.stringify(data) });
 export const api = {
-  // Lợi: nhân viên đăng nhập bằng mật khẩu.
+  // Lợi: StaffLogin -> AuthServlet /staff-login; session tạo trên Tomcat, user trả về để điều hướng.
   staffLogin: async (phone_number: string, password: string) => {
     const data = await post<{ user: UserSession }>("/auth/staff-login", { phone_number, password });
     saveUser(data.user);
     return data.user;
   },
-  // Lợi: khách yêu cầu mã OTP qua email đã khai khi tạo lệnh.
+  // Lợi: CustomerLogin bước 1 -> AuthServlet /request-otp; trả email che bớt và mã xem trước nếu demo.
   requestOtp: (phone_number: string, license_plate: string) =>
     post<{ masked_email: string; otp_preview?: string }>("/auth/request-otp", {
       phone_number,
       license_plate,
     }),
-  // Lợi: xác thực OTP và nhận phiên khách hàng.
+  // Lợi: CustomerLogin bước 2 -> AuthServlet /verify-otp; mã đúng thì Tomcat tạo session CUSTOMER.
   verifyOtp: async (phone_number: string, license_plate: string, otp_code: string) => {
     const data = await post<{ user: UserSession }>("/auth/verify-otp", {
       phone_number,
@@ -146,23 +157,25 @@ export const api = {
     saveUser(data.user);
     return data.user;
   },
-  // Lợi: đồng bộ lại tên/role từ phiên Servlet sau khi sửa dữ liệu mẫu hoặc tải lại trang.
+  // Lợi: SimpleNav -> AuthServlet /me để đọc người đang đăng nhập từ session thật.
   me: async () => {
     const user = await request<UserSession>("/auth/me");
     saveUser(user);
     return user;
   },
-  // Lợi: khách báo chuyển khoản, chưa tự đánh dấu đã thanh toán.
+  // Lợi: PaymentPage -> PaymentServlet /report; hóa đơn sang PENDING_VERIFICATION, chưa phải PAID.
   reportPayment: (order_code: string) =>
     post<{ payment_status: string }>("/payments/report", { order_code }),
-  // Lợi: quản lý đối soát và xác nhận tiền đã đến.
+  // Lợi: ManagerPage -> PaymentServlet /verify; chỉ MANAGER được chuyển hóa đơn thành PAID.
   verifyPayment: (order_code: string) =>
     post<{ payment_status: string }>("/payments/verify", { order_code }),
-  // Khởi: lấy danh sách lệnh theo quyền hiện tại.
+  // Khởi: trang khách/thợ/quản lý -> WorkOrderServlet; session quyết định các lệnh được trả về.
   getOrders: () => request<WorkOrder[]>("/work-orders/my-orders"),
-  // Khởi: lấy chi tiết lệnh được phép xem.
+  // Khởi: trang thanh toán/checklist -> WorkOrderServlet; code là order_code lấy từ URL hoặc danh sách.
+  // Servlet kiểm tra quyền rồi trả thêm items của đúng lệnh đó.
   getOrder: (code: string) => request<WorkOrder>(`/work-orders/${encodeURIComponent(code)}`),
-  // Khởi: lập một lệnh gồm nhiều dịch vụ; mọi đơn giá được tra lại tại Servlet.
+  // Khởi: form tiếp nhận -> WorkOrderServlet; gửi một xe + nhiều service_id/quantity.
+  // Backend lưu khách, xe, lệnh, hạng mục và hóa đơn; trả mã lệnh mới và tổng tiền.
   createOrder: (data: {
     license_plate: string;
     customer_phone: string;
@@ -172,17 +185,17 @@ export const api = {
     symptoms: string;
     services: ServiceSelection[];
   }) => post<{ order_code: string; total_amount: number }>("/work-orders", data),
-  // Khởi: quản lý phân công kỹ thuật viên.
+  // Khởi: trang quản lý -> AssignmentServlet; PATCH mã lệnh và ID thợ được chọn.
   assignOrder: (code: string, technician_id: number) =>
     patch<{ order_code: string }>(`/assignments/${encodeURIComponent(code)}`, { technician_id }),
-  // Khởi: thống kê hiệu suất và danh sách kỹ thuật viên cho form phân công.
+  // Khởi: trang quản lý -> ReportServlet; trả số lệnh giao/xong của từng thợ theo from/to.
   report: (from: string, to: string) =>
     request<TechnicianReport[]>(
       `/reports/technicians?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
     ),
-  // Tân: đọc danh mục và số lượng tồn.
+  // Tân: trang kho -> InventoryServlet; trả toàn bộ phụ tùng và tồn hiện tại.
   inventory: () => request<Part[]>("/inventory"),
-  // Tân: quản lý thêm phụ tùng.
+  // Tân: form kho -> InventoryServlet; MANAGER tạo phụ tùng mới.
   addPart: (data: {
     part_code: string;
     part_name: string;
@@ -190,11 +203,12 @@ export const api = {
     price: number;
     stock_quantity: number;
   }) => post<Part>("/inventory", data),
-  // Tân: quản lý chỉnh số lượng tồn.
+  // Tân: nút chỉnh tồn -> InventoryServlet; ID chỉ đúng phụ tùng, stock_quantity là tồn mới.
   setStock: (id: number, stock_quantity: number) =>
     patch<Part>(`/inventory/${id}/stock`, { stock_quantity }),
-  // Tân: danh mục dịch vụ độc lập để một xe chọn được nhiều công việc.
+  // Tân: trang kho và form lập lệnh -> ServiceServlet; trả dịch vụ, giá công và vật tư đi kèm.
   services: () => request<Service[]>("/services"),
+  // Tân: quản lý tạo dịch vụ niêm yết; default_part_id có thể null nếu chỉ tính tiền công.
   addService: (data: {
     service_code: string;
     service_name: string;
@@ -202,6 +216,7 @@ export const api = {
     default_part_id: number | null;
     default_part_quantity: number;
   }) => post<Service>("/services", data),
+  // Tân: quản lý sửa tên/giá công và định mức vật tư của dịch vụ đang có.
   updateService: (
     id: number,
     data: {
@@ -211,15 +226,15 @@ export const api = {
       default_part_quantity: number;
     },
   ) => patch<Service>(`/services/${id}`, data),
-  // Kiệt: bắt đầu sửa lệnh đã được giao.
+  // Kiệt: nút Bắt đầu -> ProgressServlet; chỉ thợ được giao chuyển RECEIVED sang IN_PROGRESS.
   startOrder: (code: string) =>
     post<{ current_status: string }>(`/progress/${encodeURIComponent(code)}/start`, {}),
-  // Kiệt: checklist từng công việc, chỉ người được phân công mới được cập nhật.
+  // Kiệt: một nút checklist -> ProgressServlet; gửi itemId và mức 0/50/100 cho dòng công.
   updateTaskProgress: (code: string, itemId: number, progress_percent: 0 | 50 | 100) =>
     patch<{ progress_percent: number }>(`/progress/${encodeURIComponent(code)}/items/${itemId}`, {
       progress_percent,
     }),
-  // Kiệt: hoàn thành sửa chữa và yêu cầu trừ kho trong giao dịch.
+  // Kiệt: nút Hoàn thành -> ProgressServlet; kiểm tra checklist và trừ kho một lần trong giao dịch.
   finishOrder: (code: string) =>
     post<{ current_status: string }>(`/progress/${encodeURIComponent(code)}/finish`, {}),
 };

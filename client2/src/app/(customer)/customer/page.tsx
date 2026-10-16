@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, WorkOrder, orderStatusLabel, paymentStatusLabel } from "@/lib/api";
+// Lợi: trang /customer chỉ hiển thị các lệnh mà session OTP được quyền xem.
 export default function CustomerOrders() {
   const [orders, setOrders] = useState<WorkOrder[]>([]),
     [error, setError] = useState("");
+  // Lợi: khi mở trang, gọi WorkOrderServlet; backend lọc theo khách và biển số trong session.
   useEffect(() => {
     api
       .getOrders()
@@ -50,6 +52,7 @@ export default function CustomerOrders() {
             className="text-amber-700 underline"
             href={`/customer/payment/${o.order_code}`}
           >
+            {/* Lợi: đưa mã lệnh vào URL để trang thanh toán biết phải tải đơn nào. */}
             Chi tiết & thanh toán
           </Link>
         </article>
