@@ -47,7 +47,9 @@ export default function PaymentPage() {
   const qrData = `https://img.vietqr.io/image/MB-0797526990-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(code)}`;
   return (
     <section className="space-y-5 max-w-2xl">
+      {/* Tiêu đề lấy code trên URL để khách biết mình đang xem đúng lệnh sửa xe nào. */}
       <h1 className="text-2xl font-bold">Thanh toán lệnh {code}</h1>
+      {/* Chỉ hiện lỗi khi request GET lệnh hoặc POST báo thanh toán thất bại. */}
       {error && (
         <p
           role="alert"
@@ -59,9 +61,11 @@ export default function PaymentPage() {
       {/* Chỉ render hóa đơn sau khi GET trả về; mỗi item là một dòng công hoặc phụ tùng. */}
       {order && (
         <div className="bg-white border rounded-xl p-6 space-y-3">
+          {/* Biển số và trạng thái sửa chữa lấy từ work_orders + vehicles qua WorkOrderServlet. */}
           <p>
             {order.license_plate} · {orderStatusLabel[order.current_status]}
           </p>
+          {/* map biến mảng items từ backend thành các dòng trên màn hình; key giúp React nhận ra từng dòng. */}
           <ul className="text-sm list-disc pl-5">
             {order.items?.map((i) => (
               <li key={i.id}>
@@ -69,11 +73,14 @@ export default function PaymentPage() {
               </li>
             ))}
           </ul>
+          {/* Tổng tiền là giá đã lưu trong lệnh/hóa đơn, không tính lại từ giá kho hiện tại. */}
           <p className="font-bold">Tổng: {amount.toLocaleString("vi-VN")} ₫</p>
+          {/* payment_status đến từ invoices: UNPAID, PENDING_VERIFICATION hoặc PAID. */}
           <p>Trạng thái: {paymentStatusLabel[order.payment_status]}</p>
           {/* QR chỉ hiện khi đã sửa xong và hóa đơn chưa được quản lý xác nhận PAID. */}
           {order.current_status === "WAITING_PAYMENT" && order.payment_status !== "PAID" && (
             <div className="space-y-3">
+              {/* VietQR dùng amount và code; ảnh không tự tạo giao dịch hay tự cập nhật database. */}
               <Image
                 src={qrData}
                 width={240}
@@ -81,10 +88,12 @@ export default function PaymentPage() {
                 unoptimized
                 alt="VietQR chuyển khoản"
               />
+              {/* Nội dung chuyển khoản chứa mã lệnh để quản lý tìm đúng khoản tiền khi đối soát. */}
               <p className="text-sm">
                 Chuyển khoản MB 0797526990, nội dung {code}. Gara sẽ đối soát trước khi xác nhận.
               </p>
-              {/* Đã báo chuyển khoản thì ẩn nút, tránh gửi lại request đang chờ đối soát. */}
+              {/* Chỉ hiện nút khi UNPAID; onClick chạy report(), disabled ngăn bấm lặp
+                  trong lúc chờ backend. Đã báo rồi thì ẩn nút và chờ quản lý đối soát. */}
               {order.payment_status === "UNPAID" && (
                 <button
                   disabled={busy}
