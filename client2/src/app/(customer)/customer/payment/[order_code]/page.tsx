@@ -1,28 +1,34 @@
 "use client";
-// Phụ trách phần mới: Lợi. VietQR chỉ là hướng dẫn chuyển khoản; khách báo, quản lý đối soát.
+// Trang thanh toán của khách: xem hóa đơn, hiện VietQR và báo đã chuyển khoản.
+// Frontend không xác nhận tiền đã đến; bước đối soát thuộc API quản lý trong PaymentServlet.
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { api, WorkOrder, orderStatusLabel, paymentStatusLabel } from "@/lib/api";
-// Lợi: trang /customer/payment/[order_code] dùng mã lệnh trên URL để xem và báo thanh toán.
+// Luồng: URL -> useParams -> GET WorkOrderServlet -> render; nút bấm -> POST PaymentServlet.
 export default function PaymentPage() {
-  // Lợi: /customer/payment/DEMO-001 -> params.order_code là "DEMO-001".
-  // Mã này là mã lệnh sửa chữa, không phải mã khách; backend vẫn kiểm tra session khi đọc.
+  // Thư mục [order_code] của Next.js nhận đoạn cuối URL: /customer/payment/DEMO-001.
+  // useParams trả { order_code: "DEMO-001" }; code là mã lệnh gửi cho API, không phải ID khách.
   const params = useParams();
   const code = String(params.order_code || "");
-  // Lợi: order là dữ liệu trả từ MySQL; ban đầu null vì request chưa hoàn thành.
+  // order bắt đầu null vì chưa có phản hồi; setOrder khiến React vẽ lại phần tiền/trạng thái.
+  // error hiện lỗi từ API, busy khóa nút để khách không gửi yêu cầu thanh toán lặp.
   const [order, setOrder] = useState<WorkOrder | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  // Lợi: khi mở trang hoặc code trong URL đổi, lấy chi tiết đúng lệnh để hiển thị tiền và trạng thái.
+  // Khi trang mở hoặc code đổi, api.getOrder gửi GET /api/v1/work-orders/{code}.
+  // WorkOrderServlet kiểm tra session khách + biển số, JOIN work_orders/invoices và trả các hạng mục.
+  // Thành công -> setOrder; lỗi (401/404/503...) -> setError để hiện thông báo.
   useEffect(() => {
     api
       .getOrder(code)
       .then(setOrder)
       .catch((e) => setError(e.message));
   }, [code]);
-  // Lợi: nút "Đã chuyển khoản" chỉ báo cho backend chuyển sang chờ đối soát.
-  // Gọi GET lần nữa để giao diện nhận trạng thái mới; chỉ quản lý mới có quyền xác nhận PAID.
+  // Nút "Đã chuyển khoản" gọi POST /api/v1/payments/report với { order_code: code }.
+  // PaymentServlet kiểm tra session CUSTOMER, xe thuộc khách và hóa đơn đang UNPAID;
+  // nếu hợp lệ, backend đổi invoices.payment_status sang PENDING_VERIFICATION.
+  // GET lại lệnh để giao diện nhận trạng thái mới; chỉ API /payments/verify của MANAGER mới đặt PAID.
   async function report() {
     setBusy(true);
     setError("");
@@ -35,7 +41,8 @@ export default function PaymentPage() {
       setBusy(false);
     }
   }
-  // Lợi: số tiền và nội dung chuyển khoản lấy từ lệnh vừa tải, không lấy từ ô nhập của khách.
+  // total_amount lấy từ lệnh do backend trả về; code đưa vào nội dung VietQR để đối soát đúng lệnh.
+  // Ảnh QR chỉ hỗ trợ chuyển khoản, không chứng minh ngân hàng đã nhận tiền.
   const amount = Number(order?.total_amount || 0);
   const qrData = `https://img.vietqr.io/image/MB-0797526990-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(code)}`;
   return (
@@ -49,6 +56,7 @@ export default function PaymentPage() {
           {error}
         </p>
       )}
+      {/* Chỉ render hóa đơn sau khi GET trả về; mỗi item là một dòng công hoặc phụ tùng. */}
       {order && (
         <div className="bg-white border rounded-xl p-6 space-y-3">
           <p>
@@ -63,6 +71,7 @@ export default function PaymentPage() {
           </ul>
           <p className="font-bold">Tổng: {amount.toLocaleString("vi-VN")} ₫</p>
           <p>Trạng thái: {paymentStatusLabel[order.payment_status]}</p>
+          {/* QR chỉ hiện khi đã sửa xong và hóa đơn chưa được quản lý xác nhận PAID. */}
           {order.current_status === "WAITING_PAYMENT" && order.payment_status !== "PAID" && (
             <div className="space-y-3">
               <Image
@@ -75,6 +84,7 @@ export default function PaymentPage() {
               <p className="text-sm">
                 Chuyển khoản MB 0797526990, nội dung {code}. Gara sẽ đối soát trước khi xác nhận.
               </p>
+              {/* Đã báo chuyển khoản thì ẩn nút, tránh gửi lại request đang chờ đối soát. */}
               {order.payment_status === "UNPAID" && (
                 <button
                   disabled={busy}
