@@ -65,6 +65,9 @@ public class EmailService {
       throws Exception {
     SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
     try (SSLSocket socket = (SSLSocket) factory.createSocket()) {
+      javax.net.ssl.SSLParameters parameters = socket.getSSLParameters();
+      parameters.setEndpointIdentificationAlgorithm("HTTPS");
+      socket.setSSLParameters(parameters);
       socket.connect(new InetSocketAddress(SMTP_HOST, SMTP_PORT), 10000);
       socket.setSoTimeout(15000);
 

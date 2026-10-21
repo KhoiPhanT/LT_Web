@@ -22,3 +22,7 @@ yarn-error.log*
 !.env.example
 !.env.backend.example
 *.properties
+
+# Python test cache
+**/__pycache__/
+*.py[cod]

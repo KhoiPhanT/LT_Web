@@ -3,6 +3,7 @@ package com.hihihaha.gara.servlet;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.hihihaha.gara.config.DBContext;
 import com.hihihaha.gara.util.EmailService;
+import com.hihihaha.gara.util.OtpStore;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,16 +13,15 @@ import java.security.SecureRandom;
 import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.mindrot.jbcrypt.BCrypt;
 
 /** Phụ trách phần mới: Lợi. Đăng nhập nhân viên và OTP email của khách hàng. */
-@WebServlet("/api/v1/auth/*")
+@WebServlet({"/api/v1/auth/*", "/actions/auth/*"})
 public class AuthServlet extends ServletSupport {
   private static final SecureRandom RANDOM = new SecureRandom();
-  private static final ConcurrentHashMap<String, Otp> OTPS = new ConcurrentHashMap<>();
   // Lợi: mặc định 5 phút; biến môi trường cho phép kiểm thử hết hạn mà không phải chờ 5 phút.
   private static final long TTL = otpTtl();
+  private static final OtpStore OTPS = new OtpStore(TTL);
 
   private static long otpTtl() {
     try {
@@ -31,17 +31,15 @@ public class AuthServlet extends ServletSupport {
     }
   }
 
-  private record Otp(String code, long sentAt, long customerId, int attempts) {}
-
   private static String plate(String value) {
-    return value.replaceAll("\\s+", "").toUpperCase();
+    return value.replaceAll("\\s+", "").toUpperCase(java.util.Locale.ROOT);
   }
 
   // Lợi: trả tên mới nhất từ MySQL; localStorage cũ chỉ là cache hiển thị.
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
     if (!"/me".equals(req.getPathInfo())) {
-      err(resp, 404, "Endpoint không tồn tại");
+      err(req, resp, 404, "Endpoint không tồn tại");
       return;
     }
     String currentRole = role(req);
@@ -53,7 +51,7 @@ public class AuthServlet extends ServletSupport {
       try (ResultSet rs = ps.executeQuery()) {
         if (!rs.next()) {
           req.getSession(false).invalidate();
-          err(resp, 401, "Phiên không còn hợp lệ");
+          err(req, resp, 401, "Phiên không còn hợp lệ");
           return;
         }
         Map<String, Object> user = new LinkedHashMap<>();
@@ -63,10 +61,10 @@ public class AuthServlet extends ServletSupport {
         user.put("phone_number", rs.getString("phone_number"));
         if ("CUSTOMER".equals(currentRole))
           user.put("license_plate", req.getSession(false).getAttribute("license_plate"));
-        ok(resp, user);
+        ok(req, resp, user);
       }
     } catch (SQLException e) {
-      err(resp, 503, "Không đọc được phiên đăng nhập");
+      err(req, resp, 503, "Không đọc được phiên đăng nhập");
     }
   }
 
@@ -76,7 +74,7 @@ public class AuthServlet extends ServletSupport {
     if ("/logout".equals(path)) {
       HttpSession s = req.getSession(false);
       if (s != null) s.invalidate();
-      ok(resp, Map.of());
+      ok(req, resp, Map.of());
       return;
     }
     JsonNode b;
@@ -84,11 +82,12 @@ public class AuthServlet extends ServletSupport {
       b = body(req);
       if (b == null || !b.isObject()) throw new IOException();
     } catch (Exception e) {
-      err(resp, 400, "JSON không hợp lệ");
+      err(req, resp, 400, "JSON không hợp lệ");
       return;
     }
     if ("/staff-login".equals(path)) {
-      String phone = str(b, "phone_number"), pass = str(b, "password");
+      String phone = str(b, "phone_number"),
+          pass = b.hasNonNull("password") ? b.get("password").asText() : "";
       try (Connection c = DBContext.getConnection();
           PreparedStatement ps =
               c.prepareStatement(
@@ -96,13 +95,15 @@ public class AuthServlet extends ServletSupport {
         ps.setString(1, phone);
         try (ResultSet rs = ps.executeQuery()) {
           if (!rs.next() || !BCrypt.checkpw(pass, rs.getString("password_hash"))) {
-            err(resp, 401, "Sai số điện thoại hoặc mật khẩu");
+            err(req, resp, 401, "Sai số điện thoại hoặc mật khẩu");
             return;
           }
           HttpSession s = newSession(req);
           s.setAttribute("role", rs.getString("role"));
+          s.setAttribute("full_name", rs.getString("full_name"));
           s.setAttribute("user_id", rs.getLong("id"));
           ok(
+              req,
               resp,
               Map.of(
                   "user",
@@ -117,7 +118,7 @@ public class AuthServlet extends ServletSupport {
                       phone)));
         }
       } catch (SQLException e) {
-        err(resp, 503, "Không kết nối được CSDL");
+        err(req, resp, 503, "Không kết nối được CSDL");
       }
       return;
     }
@@ -125,12 +126,6 @@ public class AuthServlet extends ServletSupport {
       String phone = str(b, "phone_number"),
           p = plate(str(b, "license_plate")),
           key = phone + ":" + p;
-      Otp previous = OTPS.get(key);
-      long now = System.currentTimeMillis();
-      if (previous != null && now - previous.sentAt() < 60_000L) {
-        err(resp, 429, "Vui lòng chờ 60 giây");
-        return;
-      }
       try (Connection c = DBContext.getConnection();
           PreparedStatement ps =
               c.prepareStatement(
@@ -140,29 +135,37 @@ public class AuthServlet extends ServletSupport {
         ps.setString(2, p);
         try (ResultSet rs = ps.executeQuery()) {
           if (!rs.next() || rs.getString("email") == null || rs.getString("email").isBlank()) {
-            err(resp, 404, "Không tìm thấy hồ sơ có email");
+            err(req, resp, 404, "Không tìm thấy hồ sơ có email");
             return;
           }
           String email = rs.getString("email"),
               code = String.format("%06d", RANDOM.nextInt(1_000_000));
+          OtpStore.Ticket ticket;
+          try {
+            ticket = OTPS.reserve(key, code, rs.getLong("id"));
+          } catch (IllegalStateException e) {
+            err(req, resp, 429, e.getMessage());
+            return;
+          }
           boolean demo = "true".equalsIgnoreCase(System.getenv("DEMO_MODE"));
           if (!demo) {
             try {
               EmailService.sendOtpEmail(email, rs.getString("full_name"), p, code);
             } catch (Exception e) {
-              err(resp, 503, "Không gửi được email OTP");
+              OTPS.cancel(key, ticket);
+              err(req, resp, 503, "Không gửi được email OTP");
               return;
             }
           }
-          OTPS.put(key, new Otp(code, now, rs.getLong("id"), 0));
           ok(
+              req,
               resp,
               demo
                   ? Map.of("masked_email", mask(email), "otp_preview", code)
                   : Map.of("masked_email", mask(email)));
         }
       } catch (SQLException e) {
-        err(resp, 503, "Không kết nối được CSDL");
+        err(req, resp, 503, "Không kết nối được CSDL");
       }
       return;
     }
@@ -171,37 +174,23 @@ public class AuthServlet extends ServletSupport {
           p = plate(str(b, "license_plate")),
           key = phone + ":" + p,
           code = str(b, "otp_code");
-      Otp entry = OTPS.get(key);
-      if (entry == null || System.currentTimeMillis() - entry.sentAt() > TTL) {
-        OTPS.remove(key);
-        err(resp, 400, "OTP đã hết hạn");
+      OtpStore.Result result = OTPS.verify(key, code);
+      if (result.status() != 200) {
+        err(req, resp, result.status(), result.message());
         return;
       }
-      if (entry.attempts() >= 5) {
-        OTPS.remove(key);
-        err(resp, 429, "Đã thử quá số lần cho phép");
-        return;
-      }
-      if (!entry.code().equals(code)) {
-        OTPS.replace(
-            key,
-            entry,
-            new Otp(entry.code(), entry.sentAt(), entry.customerId(), entry.attempts() + 1));
-        err(resp, 400, "OTP không đúng");
-        return;
-      }
-      OTPS.remove(key);
       HttpSession s = newSession(req);
       s.setAttribute("role", "CUSTOMER");
-      s.setAttribute("user_id", entry.customerId());
+      s.setAttribute("user_id", result.customerId());
       s.setAttribute("license_plate", p);
       ok(
+          req,
           resp,
           Map.of(
               "user",
               Map.of(
                   "id",
-                  entry.customerId(),
+                  result.customerId(),
                   "role",
                   "CUSTOMER",
                   "phone_number",
@@ -210,7 +199,7 @@ public class AuthServlet extends ServletSupport {
                   p)));
       return;
     }
-    err(resp, 404, "Endpoint không tồn tại");
+    err(req, resp, 404, "Endpoint không tồn tại");
   }
 
   private static HttpSession newSession(HttpServletRequest req) {

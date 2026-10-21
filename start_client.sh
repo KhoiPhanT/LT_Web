@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# Tân: chạy giao diện Next.js đã tinh gọn cho bốn luồng.
-set -e
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$DIR/client2"
-
-echo "==================================================="
-echo "  ĐANG KHỞI ĐỘNG CLIENT 2 (NEXT.JS - PORT 3001)"
-echo "  BACKEND PROXY (PORT 8089)"
-echo "==================================================="
-
-echo "Đang khởi chạy Next.js Dev Server trên port 3001..."
-npx next dev -p 3001
+# JSP được Tomcat phục vụ cùng Servlet; không có tiến trình frontend riêng.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+COMPOSE=(docker compose)
+if [[ -f .env.backend.local ]]; then COMPOSE+=(--env-file .env.backend.local); fi
+TASK_WEB_ADDRESS="$("${COMPOSE[@]}" port backend2_servlet 8080)"
+echo "Mở giao diện JSP: http://${TASK_WEB_ADDRESS}/"

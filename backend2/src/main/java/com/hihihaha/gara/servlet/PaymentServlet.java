@@ -10,7 +10,7 @@ import java.sql.*;
 import java.util.Map;
 
 /** Nhận yêu cầu báo chuyển khoản của khách và xác nhận đã nhận tiền của quản lý. */
-@WebServlet("/api/v1/payments/*")
+@WebServlet({"/api/v1/payments/*", "/actions/payments/*"})
 public class PaymentServlet extends ServletSupport {
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -18,7 +18,7 @@ public class PaymentServlet extends ServletSupport {
     String path = req.getPathInfo();
     boolean report = "/report".equals(path), verify = "/verify".equals(path);
     if (!report && !verify) {
-      err(resp, 404, "Endpoint không tồn tại");
+      err(req, resp, 404, "Endpoint không tồn tại");
       return;
     }
     // Role lấy từ HttpSession, không tin role hay trạng thái do trình duyệt gửi lên.
@@ -27,13 +27,13 @@ public class PaymentServlet extends ServletSupport {
     try {
       b = body(req);
     } catch (Exception e) {
-      err(resp, 400, "JSON không hợp lệ");
+      err(req, resp, 400, "JSON không hợp lệ");
       return;
     }
     // Cả hai trang chỉ gửi mã lệnh; trạng thái thật được đọc lại từ MySQL.
     String code = str(b, "order_code");
     if (code.isBlank()) {
-      err(resp, 400, "Thiếu mã lệnh");
+      err(req, resp, 400, "Thiếu mã lệnh");
       return;
     }
     try (Connection c = DBContext.getConnection()) {
@@ -58,7 +58,7 @@ public class PaymentServlet extends ServletSupport {
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) {
               c.rollback();
-              err(resp, 404, "Không tìm thấy lệnh được phép thanh toán");
+              err(req, resp, 404, "Không tìm thấy lệnh được phép thanh toán");
               return;
             }
             id = rs.getLong("id");
@@ -72,7 +72,7 @@ public class PaymentServlet extends ServletSupport {
             || verify
                 && (!"WAITING_PAYMENT".equals(status) || !"PENDING_VERIFICATION".equals(payment))) {
           c.rollback();
-          err(resp, 409, "Lệnh chưa ở trạng thái thanh toán phù hợp");
+          err(req, resp, 409, "Lệnh chưa ở trạng thái thanh toán phù hợp");
           return;
         }
         // /report chỉ chuyển hóa đơn sang chờ đối soát; /verify mới chuyển thành PAID.
@@ -97,14 +97,15 @@ public class PaymentServlet extends ServletSupport {
         // Phản hồi là trạng thái mới để frontend biết thao tác đã được lưu.
         c.commit();
         ok(
+            req,
             resp,
             Map.of("order_code", code, "payment_status", report ? "PENDING_VERIFICATION" : "PAID"));
       } catch (SQLException e) {
         c.rollback();
-        err(resp, 503, "Không lưu được thanh toán");
+        err(req, resp, 503, "Không lưu được thanh toán");
       }
     } catch (SQLException e) {
-      err(resp, 503, "Không kết nối được CSDL");
+      err(req, resp, 503, "Không kết nối được CSDL");
     }
   }
 }

@@ -16,7 +16,18 @@ public class SessionAuthFilter implements Filter {
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
     HttpServletResponse resp = (HttpServletResponse) response;
-    String path = req.getRequestURI().substring(req.getContextPath().length());
+    resp.setHeader("Cache-Control", "no-store");
+    String path = req.getServletPath() + (req.getPathInfo() == null ? "" : req.getPathInfo());
+    // JSON API không nhận body text/plain/form do website khác tự gửi bằng form HTML.
+    if (!java.util.Set.of("GET", "HEAD", "OPTIONS").contains(req.getMethod())
+        && (req.getContentType() == null
+            || !req.getContentType()
+                .split(";", 2)[0]
+                .trim()
+                .equalsIgnoreCase("application/json"))) {
+      ResponseUtil.sendError(resp, "API yêu cầu Content-Type application/json", 415);
+      return;
+    }
     if (path.equals("/api/v1/health")
         || path.equals("/api/v1/auth/staff-login")
         || path.equals("/api/v1/auth/request-otp")

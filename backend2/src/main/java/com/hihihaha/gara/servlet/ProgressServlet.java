@@ -14,7 +14,7 @@ import java.util.Map;
  * Phụ trách phần mới: Kiệt. Checklist công việc và tiến độ lệnh được giao; trừ kho một lần khi
  * xong.
  */
-@WebServlet("/api/v1/progress/*")
+@WebServlet({"/api/v1/progress/*", "/actions/progress/*"})
 public class ProgressServlet extends ServletSupport {
   private final InventoryDAO inventory = new InventoryDAO();
 
@@ -25,7 +25,7 @@ public class ProgressServlet extends ServletSupport {
     if (parts.length != 3
         || parts[1].isBlank()
         || !(parts[2].equals("start") || parts[2].equals("finish"))) {
-      err(resp, 404, "Endpoint không tồn tại");
+      err(req, resp, 404, "Endpoint không tồn tại");
       return;
     }
     boolean finish = parts[2].equals("finish");
@@ -45,7 +45,7 @@ public class ProgressServlet extends ServletSupport {
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) {
               c.rollback();
-              err(resp, 404, "Lệnh không được giao cho bạn");
+              err(req, resp, 404, "Lệnh không được giao cho bạn");
               return;
             }
             id = rs.getLong("id");
@@ -56,7 +56,7 @@ public class ProgressServlet extends ServletSupport {
         if ((!finish && !"RECEIVED".equals(status))
             || (finish && (!"IN_PROGRESS".equals(status) || deducted != null))) {
           c.rollback();
-          err(resp, 409, "Trạng thái lệnh không cho phép thao tác này");
+          err(req, resp, 409, "Trạng thái lệnh không cho phép thao tác này");
           return;
         }
         // Kiệt: chỉ hoàn thành khi mọi công việc trong checklist đạt 100%.
@@ -70,7 +70,11 @@ public class ProgressServlet extends ServletSupport {
               rs.next();
               if (rs.getInt("total") == 0 || rs.getInt("incomplete") > 0) {
                 c.rollback();
-                err(resp, 409, "Cần hoàn thành 100% các công việc trước khi kết thúc sửa chữa");
+                err(
+                    req,
+                    resp,
+                    409,
+                    "Cần hoàn thành 100% các công việc trước khi kết thúc sửa chữa");
                 return;
               }
             }
@@ -88,18 +92,20 @@ public class ProgressServlet extends ServletSupport {
         }
         c.commit();
         ok(
+            req,
             resp,
             Map.of(
                 "order_code", code, "current_status", finish ? "WAITING_PAYMENT" : "IN_PROGRESS"));
       } catch (SQLException e) {
         c.rollback();
         err(
+            req,
             resp,
             "45000".equals(e.getSQLState()) ? 409 : 503,
             "45000".equals(e.getSQLState()) ? e.getMessage() : "Không cập nhật được tiến độ");
       }
     } catch (SQLException e) {
-      err(resp, 503, "Không kết nối được CSDL");
+      err(req, resp, 503, "Không kết nối được CSDL");
     }
   }
 
@@ -109,7 +115,7 @@ public class ProgressServlet extends ServletSupport {
     if (!allow(req, resp, "TECHNICIAN")) return;
     String path = req.getPathInfo();
     if (path == null || !path.matches("/[^/]+/items/\\d+")) {
-      err(resp, 404, "Endpoint không tồn tại");
+      err(req, resp, 404, "Endpoint không tồn tại");
       return;
     }
     String[] segments = path.split("/");
@@ -118,19 +124,19 @@ public class ProgressServlet extends ServletSupport {
     try {
       itemId = Long.parseLong(segments[3]);
     } catch (NumberFormatException e) {
-      err(resp, 400, "ID công việc không hợp lệ");
+      err(req, resp, 400, "ID công việc không hợp lệ");
       return;
     }
     JsonNode body;
     try {
       body = body(req);
     } catch (Exception e) {
-      err(resp, 400, "JSON không hợp lệ");
+      err(req, resp, 400, "JSON không hợp lệ");
       return;
     }
     long progress = num(body, "progress_percent");
     if (progress != 0 && progress != 50 && progress != 100) {
-      err(resp, 400, "Tiến độ chỉ nhận 0, 50 hoặc 100%");
+      err(req, resp, 400, "Tiến độ chỉ nhận 0, 50 hoặc 100%");
       return;
     }
     try (Connection c = DBContext.getConnection()) {
@@ -146,13 +152,13 @@ public class ProgressServlet extends ServletSupport {
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) {
               c.rollback();
-              err(resp, 404, "Lệnh không được giao cho bạn");
+              err(req, resp, 404, "Lệnh không được giao cho bạn");
               return;
             }
             orderId = rs.getLong("id");
             if (!"IN_PROGRESS".equals(rs.getString("status"))) {
               c.rollback();
-              err(resp, 409, "Chỉ sửa checklist khi lệnh đang thi công");
+              err(req, resp, 409, "Chỉ sửa checklist khi lệnh đang thi công");
               return;
             }
           }
@@ -166,7 +172,7 @@ public class ProgressServlet extends ServletSupport {
           try (ResultSet rs = ps.executeQuery()) {
             if (!rs.next()) {
               c.rollback();
-              err(resp, 404, "Không tìm thấy công việc trong lệnh");
+              err(req, resp, 404, "Không tìm thấy công việc trong lệnh");
               return;
             }
           }
@@ -178,13 +184,13 @@ public class ProgressServlet extends ServletSupport {
           ps.executeUpdate();
         }
         c.commit();
-        ok(resp, Map.of("order_code", code, "item_id", itemId, "progress_percent", progress));
+        ok(req, resp, Map.of("order_code", code, "item_id", itemId, "progress_percent", progress));
       } catch (SQLException e) {
         c.rollback();
-        err(resp, 503, "Không cập nhật được công việc");
+        err(req, resp, 503, "Không cập nhật được công việc");
       }
     } catch (SQLException e) {
-      err(resp, 503, "Không kết nối được CSDL");
+      err(req, resp, 503, "Không kết nối được CSDL");
     }
   }
 }

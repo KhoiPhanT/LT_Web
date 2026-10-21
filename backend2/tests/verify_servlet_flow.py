@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 import uuid
 
-BASE = os.environ.get("GARA_API_BASE", "http://127.0.0.1:8089/api/v1")
+BASE = os.environ.get("GARA_API_BASE", "http://127.0.0.1:18089/api/v1")
 
 
 def client():
@@ -234,7 +234,7 @@ assert (
         customer,
         "POST",
         "/auth/verify-otp",
-        {"phone_number": phone, "license_plate": plate, "otp_code": "000000"},
+        {"phone_number": phone, "license_plate": plate, "otp_code": "000001" if otp_code == "000000" else "000000"},
     )[0]
     == 400
 )
@@ -290,7 +290,7 @@ o2 = call(
     {
         "license_plate": "SHORT" + short,
         "vehicle_model": "Xe demo",
-        "customer_phone": "090" + short,
+        "customer_phone": "090" + str(int(short, 16))[-7:].zfill(7),
         "customer_name": "Khách thiếu kho",
         "customer_email": "demo@example.com",
         "symptoms": "Kiểm thử thiếu kho",

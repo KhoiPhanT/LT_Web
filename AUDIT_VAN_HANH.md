@@ -1,3 +1,5 @@
+> Tài liệu phiên bản trước khi chuyển JSP. Luồng và mã nguồn bổ sung của lần sửa 21/10/2026 xem [LUONG_NGHIEP_VU_JSP](docs/LUONG_NGHIEP_VU_JSP.md), cách chạy xem [README](README.md).
+
 # Rà soát vận hành bản Servlet tinh gọn
 
 Bản chạy hiện tại là Next.js → Tomcat/Jakarta Servlet → MySQL 8 bảng quan hệ. `AppServer` và các DAO/model cũ đã được xóa khỏi dự án; không nằm trong WAR.

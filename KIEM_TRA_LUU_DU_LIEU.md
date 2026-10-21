@@ -1,3 +1,5 @@
+> Tài liệu phiên bản trước khi chuyển JSP. Luồng và mã nguồn bổ sung của lần sửa 21/10/2026 xem [LUONG_NGHIEP_VU_JSP](docs/LUONG_NGHIEP_VU_JSP.md), cách chạy xem [README](README.md).
+
 # Kiểm tra lưu dữ liệu của bản Servlet/MySQL
 
 **Phụ trách kiểm tra:** Lợi (quyền, OTP, thanh toán), Khởi (lệnh, phân công, báo cáo), Tân (kho), Kiệt (tiến độ). Kiểm thử `AppServer` cũ đã được loại khỏi dự án.

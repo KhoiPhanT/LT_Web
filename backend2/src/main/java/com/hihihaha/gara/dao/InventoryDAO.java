@@ -41,12 +41,19 @@ public class InventoryDAO {
     }
   }
 
-  public Map<String, Object> setStock(long id, int stock) throws SQLException {
+  public Map<String, Object> setStock(long id, int stock, int expectedStock) throws SQLException {
     try (Connection c = DBContext.getConnection();
-        PreparedStatement ps = c.prepareStatement("UPDATE parts SET stock_quantity=? WHERE id=?")) {
+        PreparedStatement ps =
+            c.prepareStatement(
+                "UPDATE parts SET stock_quantity=? WHERE id=? AND stock_quantity=?")) {
       ps.setInt(1, stock);
       ps.setLong(2, id);
-      if (ps.executeUpdate() == 0) return null;
+      ps.setInt(3, expectedStock);
+      if (ps.executeUpdate() == 0) {
+        if (byId(c, id) == null) return null;
+        throw new SQLException(
+            "Tồn kho đã thay đổi từ khi mở trang. Tải lại kho và kiểm tra trước khi lưu.", "45000");
+      }
       return byId(c, id);
     }
   }

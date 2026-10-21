@@ -1,0 +1,1 @@
+{"result": "PASS", "context": "/gara", "checked": ["home_UTF8", "form_action", "session_login", "CSS", "normalized_role_paths", "logout_redirect"]}

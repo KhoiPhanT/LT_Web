@@ -10,26 +10,26 @@ import java.sql.*;
 import java.util.Map;
 
 /** Phụ trách phần mới: Khởi. Quản lý giao lệnh cho kỹ thuật viên còn hoạt động. */
-@WebServlet("/api/v1/assignments/*")
+@WebServlet({"/api/v1/assignments/*", "/actions/assignments/*"})
 public class AssignmentServlet extends ServletSupport {
   @Override
   protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
     if (!allow(req, resp, "MANAGER")) return;
     String code = req.getPathInfo() == null ? "" : req.getPathInfo().replaceFirst("^/", "");
     if (code.isBlank() || code.contains("/")) {
-      err(resp, 400, "Thiếu mã lệnh");
+      err(req, resp, 400, "Thiếu mã lệnh");
       return;
     }
     JsonNode b;
     try {
       b = body(req);
     } catch (Exception e) {
-      err(resp, 400, "JSON không hợp lệ");
+      err(req, resp, 400, "JSON không hợp lệ");
       return;
     }
     long tech = num(b, "technician_id");
     if (tech <= 0) {
-      err(resp, 400, "Chưa chọn kỹ thuật viên");
+      err(req, resp, 400, "Chưa chọn kỹ thuật viên");
       return;
     }
     try (Connection c = DBContext.getConnection()) {
@@ -38,7 +38,7 @@ public class AssignmentServlet extends ServletSupport {
         check.setLong(1, tech);
         try (ResultSet rs = check.executeQuery()) {
           if (!rs.next()) {
-            err(resp, 400, "Kỹ thuật viên không tồn tại");
+            err(req, resp, 400, "Kỹ thuật viên không tồn tại");
             return;
           }
         }
@@ -50,13 +50,13 @@ public class AssignmentServlet extends ServletSupport {
         ps.setLong(1, tech);
         ps.setString(2, code);
         if (ps.executeUpdate() == 0) {
-          err(resp, 409, "Chỉ phân công được lệnh mới tiếp nhận");
+          err(req, resp, 409, "Chỉ phân công được lệnh mới tiếp nhận");
           return;
         }
       }
-      ok(resp, Map.of("order_code", code, "technician_id", tech));
+      ok(req, resp, Map.of("order_code", code, "technician_id", tech));
     } catch (SQLException e) {
-      err(resp, 503, "Không phân công được lệnh");
+      err(req, resp, 503, "Không phân công được lệnh");
     }
   }
 }

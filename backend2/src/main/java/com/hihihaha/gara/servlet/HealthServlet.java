@@ -17,11 +17,11 @@ public class HealthServlet extends ServletSupport {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
     try (Connection c = DBContext.getConnection()) {
-      if (c.isValid(2)) ok(resp, java.util.Map.of("backend", "servlet", "database", "mysql"));
-      else err(resp, 503, "CSDL chưa sẵn sàng");
+      if (c.isValid(2)) ok(req, resp, java.util.Map.of("backend", "servlet", "database", "mysql"));
+      else err(req, resp, 503, "CSDL chưa sẵn sàng");
     } catch (Exception e) {
       LOGGER.log(Level.WARNING, "Kiểm tra kết nối MySQL thất bại", e);
-      err(resp, 503, "CSDL chưa sẵn sàng");
+      err(req, resp, 503, "CSDL chưa sẵn sàng");
     }
   }
 }

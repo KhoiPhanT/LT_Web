@@ -1,0 +1,1 @@
+{"result": "PASS", "jsp_order": "WO-54BAD151", "checked": ["UTF-8", "CSRF", "role_pages", "draft_review", "duplicate_submit", "escaped_output", "inventory", "services", "assignment", "checklist", "stock", "OTP", "VietQR", "report_payment", "verify_payment", "logout"]}

@@ -27,7 +27,15 @@ public final class DBContext {
             + port
             + "/"
             + name
-            + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8";
-    return DriverManager.getConnection(url, user, pass);
+            + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8&connectTimeout=5000&socketTimeout=10000";
+    Connection connection = DriverManager.getConnection(url, user, pass);
+    // TIMESTAMP và lọc ngày báo cáo cùng dùng giờ Việt Nam, kể cả MySQL server chạy UTC.
+    try (java.sql.Statement statement = connection.createStatement()) {
+      statement.execute("SET time_zone='+07:00'");
+      return connection;
+    } catch (SQLException e) {
+      connection.close();
+      throw e;
+    }
   }
 }

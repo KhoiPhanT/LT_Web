@@ -1,0 +1,61 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<fmt:setLocale value="vi_VN" />
+<c:set var="ctx" value="${pageContext.request.contextPath}" />
+<c:set var="statusNames"
+  value="${{'RECEIVED':'Chờ phân công / bắt đầu','IN_PROGRESS':'Đang sửa chữa','WAITING_PAYMENT':'Chờ thanh toán','COMPLETED':'Đã hoàn tất'}}" />
+<c:set var="paymentNames"
+  value="${{'UNPAID':'Chưa thanh toán','PENDING_VERIFICATION':'Chờ gara đối soát','PAID':'Đã nhận tiền'}}" />
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HiHiHaHa Auto · Gara</title>
+  <link rel="stylesheet" href="${ctx}/assets/style.css">
+</head>
+
+<body>
+  <header><a class="brand" href="${ctx}/home">HiHiHaHa Auto <small>GARA SỬA XE</small></a>
+    <nav aria-label="Điều hướng chính">
+      <c:choose>
+        <c:when test="${not empty sessionScope.role}">
+          <a href="${ctx}/orders">Phiếu sửa chữa</a>
+          <c:if test="${sessionScope.role == 'TECHNICIAN'}"><a href="${ctx}/orders/new">Tiếp nhận xe</a></c:if>
+          <c:if test="${sessionScope.role == 'MANAGER'}"><a href="${ctx}/inventory">Kho phụ tùng</a><a
+              href="${ctx}/services">Dịch vụ</a><a href="${ctx}/reports">Hiệu suất</a></c:if>
+          <form class="inline" method="post" action="${ctx}/actions/auth/logout"><input type="hidden" name="csrf"
+              value="${sessionScope.csrf}"><button class="link">Đăng xuất</button></form>
+        </c:when>
+        <c:otherwise><a href="${ctx}/login/customer">Tra cứu xe</a><a href="${ctx}/login/staff">Nhân viên</a>
+        </c:otherwise>
+      </c:choose>
+    </nav>
+  </header>
+  <main>
+    <c:if test="${not empty sessionScope.role}">
+      <p class="eyebrow">
+        <c:choose>
+          <c:when test="${sessionScope.role == 'MANAGER'}">Quản lý gara</c:when>
+          <c:when test="${sessionScope.role == 'TECHNICIAN'}">Kỹ thuật viên ·
+            <c:out value="${sessionScope.full_name}" />
+          </c:when>
+          <c:otherwise>Khách hàng · Xe
+            <c:out value="${sessionScope.license_plate}" />
+          </c:otherwise>
+        </c:choose>
+      </p>
+    </c:if>
+    <c:if test="${not empty sessionScope.flash}">
+      <p class="notice" role="status">
+        <c:out value="${sessionScope.flash}" />
+      </p>
+      <c:remove var="flash" scope="session" />
+    </c:if>
+    <c:if test="${not empty error}">
+      <p class="notice" role="alert">
+        <c:out value="${error}" />
+      </p>
+    </c:if>

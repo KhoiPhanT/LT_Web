@@ -1,47 +1,80 @@
-# HiHiHaHa Auto — đồ án Lập trình Web
+# HiHiHaHa Auto — Java Servlet, JSP và MySQL
 
-Ứng dụng quản lý gara tinh gọn cho nhóm bốn người. Giao diện Next.js chuyển `/api/v1/*` tới **Java Servlet trên Tomcat**; Servlet dùng JDBC và 8 bảng MySQL. Mã `AppServer`, DAO/model cũ, các trang và thư viện không còn dùng đã được xóa khỏi dự án.
+Đồ án quản lý gara với giao diện JSP trắng đen. Trình duyệt gửi form đến Servlet; Servlet kiểm tra quyền, đọc/ghi MySQL qua JDBC và hiển thị JSP. Chạy **một ứng dụng Tomcat**, không cần Node.js hay Next.js.
 
-## Chức năng và vai trò
+Mã nguồn làm việc nằm trong `LTWEB/LT_Web`. Các bài giảng gốc nằm cạnh dự án, ở `LTWEB/tham-khao`. Bản sửa giữ ba vai trò, tám bảng và các chức năng của repo gốc. [Phân công Khởi/Lợi/Tân/Kiệt theo từng form, endpoint và hàm xử lý](PHAN_CONG_CODE.md). [Luồng và bảng đối chiếu đầy đủ](docs/LUONG_NGHIEP_VU_JSP.md).
 
-| Vai trò | Chức năng |
+## Chạy nhanh
+
+Cần Docker Desktop đang chạy:
+
+```sh
+cp .env.backend.example .env.backend.local
+# Sửa MYSQL_ROOT_PASSWORD trong .env.backend.local.
+./start_backend.sh
+```
+
+Mở [http://localhost:8089](http://localhost:8089). Script đọc `.env.backend.local` bằng Docker Compose, tạo MySQL, nạp schema/seed rồi build WAR và chạy Tomcat. `DEMO_MODE=true` hiện OTP thử ngay trên trang, không gửi email. Các cổng có thể đổi trong `.env.backend.local`. Nếu đã có volume MySQL, dùng lại mật khẩu của volume đó.
+
+Trên máy đang thực hiện bản sửa, đã cấu hình riêng project Docker `ltweb-gara`, MySQL cổng `13307`, web cổng `8089`; mật khẩu cục bộ nằm trong file môi trường được Git bỏ qua. [Hướng dẫn Docker, Windows và Tomcat thủ công](HUONG_DAN_CHAY_THUC_TE.md).
+
+## Vai trò và đường đi
+
+| Vai trò | Công việc |
 | --- | --- |
-| Quản lý gara (`MANAGER`) | Phân công lệnh, quản lý kho và danh mục dịch vụ/giá công, xem hiệu suất kỹ thuật viên, đối soát VietQR |
-| Kỹ thuật viên kiêm tư vấn (`TECHNICIAN`) | Tiếp nhận xe, chọn nhiều dịch vụ cho một xe, cập nhật checklist 0/50/100% và hoàn thành lệnh được giao |
-| Khách hàng (`CUSTOMER`) | Xác minh biển số + số điện thoại bằng OTP email, xem lệnh, báo đã chuyển khoản |
+| Quản lý (`MANAGER`) | Xem phiếu; phân công người sửa; quản lý phụ tùng, tồn thực tế, dịch vụ và giá công; xem hiệu suất theo ngày; đối soát chuyển khoản và hoàn tất phiếu |
+| Kỹ thuật viên kiêm tư vấn (`TECHNICIAN`) | Tiếp nhận xe; chọn nhiều dịch vụ và số lượng; xem lại chi phí; theo dõi phiếu mình tạo/được giao; bắt đầu, lưu tiến độ từng việc và kết thúc sửa chữa |
+| Khách hàng (`CUSTOMER`) | Xác minh biển số + điện thoại bằng OTP email; chỉ xem phiếu của xe đã xác minh; xem tiến độ, chi tiết tiền công/vật tư, VietQR; báo đã chuyển khoản |
 
-Lệnh đi qua `RECEIVED → IN_PROGRESS → WAITING_PAYMENT → COMPLETED`. Hóa đơn đi qua `UNPAID → PENDING_VERIFICATION → PAID`. Dịch vụ có giá công riêng, có thể gắn vật tư mặc định hoặc chỉ có tiền công. Một xe có thể dùng nhiều dịch vụ trong một lệnh; Servlet lấy giá công và vật tư từ MySQL rồi lưu giá tại thời điểm lập lệnh. Khi mọi công việc đạt 100%, Servlet trừ phụ tùng một lần trong cùng giao dịch MySQL với chuyển trạng thái. Khách báo đã chuyển khoản không tự xác nhận `PAID`; quản lý đối soát thủ công. VNPay chưa tích hợp nên không có nút thanh toán giả.
+Luồng:
 
-## Chạy dự án
+1. Kỹ thuật viên nhập thông tin khách/xe và chọn dịch vụ ở `/orders/new`.
+2. Trang `/orders/review` hiển thị thông tin và tổng dự kiến. Có thể quay lại sửa; chưa ghi phiếu vào DB.
+3. Xác nhận tiếp nhận mới tạo phiếu `RECEIVED`. Quản lý mở phiếu và phân công, thấy số phiếu mỗi thợ đang nhận.
+4. Người được giao bắt đầu sửa; chọn rõ “Chưa làm / Đang làm / Đã xong” cho từng công việc rồi lưu.
+5. Khi mọi việc đạt 100%, người sửa xác nhận hoàn thành. Hệ thống kiểm tra và trừ vật tư một lần trong transaction, chuyển `WAITING_PAYMENT`.
+6. Khách xem hóa đơn và VietQR, chuyển khoản rồi báo gara. Hóa đơn chuyển `PENDING_VERIFICATION`.
+7. Quản lý kiểm tra giao dịch thực, xác nhận đã nhận đủ tiền; hóa đơn `PAID`, phiếu `COMPLETED`, gara bàn giao xe.
 
-[Hướng dẫn chạy thực tế](HUONG_DAN_CHAY_THUC_TE.md) ghi các lệnh đã kiểm chứng trên máy hiện tại và kịch bản demo từ dữ liệu mẫu.
+Các trạng thái dữ liệu giữ nguyên repo: `RECEIVED → IN_PROGRESS → WAITING_PAYMENT → COMPLETED`; hóa đơn `UNPAID → PENDING_VERIFICATION → PAID`. Bàn giao được diễn đạt trong bước hoàn tất, **không có trạng thái bàn giao riêng**. Giữ VietQR/đối soát thủ công; chưa tích hợp VNPay.
 
-1. Cài Docker Desktop và Node.js. Sao chép `.env.backend.example` thành `.env.backend.local`, đặt `MYSQL_ROOT_PASSWORD`. Đặt `GMAIL_USER`/`GMAIL_APP_PASSWORD` để gửi email thật; `DEMO_MODE=true` chỉ để xem mã OTP thử nghiệm trên máy demo.
-   Nếu đã có volume MySQL từ bản cũ, dùng lại mật khẩu root của volume đó; đổi biến môi trường không đổi mật khẩu bên trong volume.
-2. macOS/Linux: `./start_backend.sh`; Windows: khai báo các biến môi trường rồi chạy `start_backend.bat`. Script khởi động MySQL, áp dụng `backend2/src/main/resources/database/init.sql` với UTF-8 rồi khởi động WAR trên Tomcat. Script SQL có thể chạy lại, sửa các tên seed từng bị lỗi mã hóa và không xóa CSDL cũ.
-3. Chạy `./start_client.sh` (Windows: `start_client.bat`), mở `http://localhost:3001`. Health check: `http://localhost:8089/api/v1/health` phải trả `backend: servlet` và `database: mysql`.
+## Tài khoản demo
 
-MySQL demo là `hihihaha_simple_db`, cổng mặc định `3307` (máy đang kiểm thử dùng `13307` qua `MYSQL_HOST_PORT`). API Servlet mặc định dùng cổng `8089`, Web dùng cổng `3001`. Docker chỉ mở MySQL/API trên `127.0.0.1`. Có thể đổi `MYSQL_HOST_PORT`/`BACKEND_HOST_PORT` trong `.env.backend.local`; khi đổi cổng backend, sửa `INTERNAL_BACKEND_URL` của Next.js cho khớp.
+Vào `/login/staff`, mật khẩu chung **123456**:
 
-Tài khoản và hồ sơ mẫu ở [TAI_KHOAN_TEST.md](TAI_KHOAN_TEST.md). Seed có 14 phụ tùng và 16 dịch vụ niêm yết, cùng 5 lệnh đủ các trạng thái; khách có thể dùng ngay biển số và số điện thoại mẫu để yêu cầu OTP khi `DEMO_MODE=true`. Schema và dữ liệu mẫu ở [init.sql](backend2/src/main/resources/database/init.sql). CSDL cũ `app_state` không được chuyển tự động và không bị script mới xóa.
-
-## Bốn luồng trình bày
-
-| Thành viên | Giao diện → Servlet → MySQL |
+| Người dùng | Điện thoại |
 | --- | --- |
-| Lợi | Đăng nhập/OTP và VietQR → `AuthServlet`, `PaymentServlet` → `customers`, `invoices` |
-| Khởi | Tiếp nhận/phân công/báo cáo → `WorkOrderServlet`, `AssignmentServlet`, `ReportServlet` → `work_orders`, `work_order_items`, `vehicles` |
-| Tân | Kho và dịch vụ niêm yết → `InventoryServlet`, `ServiceServlet`, `InventoryDAO`, `ServiceDAO` → `parts`, `services` |
-| Kiệt | Bắt đầu/cập nhật checklist/hoàn thành lệnh → `ProgressServlet`, `InventoryDAO.deductForOrder` → trạng thái lệnh và tồn kho |
+| Quản lý | `0988888802` |
+| Kỹ thuật viên An | `0988888803` |
+| Kỹ thuật viên Bình | `0988888804` |
 
-Mỗi file mới/viết lại ghi người phụ trách ở đầu file; file dùng chung ghi theo hàm hoặc khối chức năng. [Bảng phân công code](PHAN_CONG_CODE.md) liệt kê từng file và hàm. Kịch bản demo ở [KICH_BAN_THUYET_TRINH_DAY_DU.md](bao_cao/KICH_BAN_THUYET_TRINH_DAY_DU.md).
-Nhãn “phụ trách” là phân công rà soát, hoàn thiện và trình bày module; nhóm cần cập nhật nhãn theo đóng góp thực tế trước khi nộp.
+Khách vào `/login/customer`: `59A-12345` + `0901234567`, hoặc `51H-67890` + `0902345678`. [Chi tiết tài khoản và email thật](TAI_KHOAN_TEST.md).
+
+## Đọc mã nguồn
+
+- `backend2/src/main/webapp/WEB-INF/views`: JSP, JSTL/EL, form HTML; không truy vấn SQL trong JSP.
+- `backend2/src/main/webapp/assets/style.css`: CSS trắng đen, có bố cục màn hình hẹp.
+- `servlet/PageServlet.java`: chuẩn bị các trang và phiếu nháp.
+- `servlet/WorkOrderServlet`, `AssignmentServlet`, `ProgressServlet`, `PaymentServlet`, `InventoryServlet`, `ServiceServlet`, `AuthServlet`: xử lý form theo nghiệp vụ hiện có.
+- `servlet/WebFlow.java`: đọc giá trị form và chuyển trang sau khi lưu. Dùng chung nghiệp vụ với API JSON cũ; không gọi HTTP nội bộ, không để JSP gọi API.
+- `dao/OrderDAO`, `StaffDAO`, `InventoryDAO`, `ServiceDAO`: truy vấn JDBC.
+- `filter/WebSessionFilter`: phiên, quyền mở trang, mã CSRF cho form; `SessionAuthFilter` bảo vệ API cũ.
+- `backend2/src/main/resources/database/init.sql`: tám bảng, dữ liệu mẫu; giữ schema gốc.
+
+Tên nhân viên và quyền được lưu trong HttpSession. Không dùng localStorage để quyết định quyền. POST lưu thành công trả redirect 303 để refresh trang không gửi lại form; phiếu nháp có mã xác nhận riêng để chống tạo trùng và nhầm giữa hai tab.
+
+`client2/` đã được loại khỏi bản JSP; giao diện Next.js cũ có thể xem ở commit nguồn `a141d3595f51beb67c05470de8f792aaee5fd4c0` trong lịch sử Git. Các báo cáo và bảng phân công cũ là tài liệu của phiên bản trước; tài liệu luồng mới ở `docs/` là căn cứ cho lần sửa này.
 
 ## Kiểm tra
 
-- `cd backend2 && mvn package` để build WAR.
-- `cd client2 && npm ci && npm run build` để build giao diện.
-- Khi Tomcat/MySQL đang chạy: `python3 backend2/tests/verify_servlet_flow.py`. Test tạo dữ liệu riêng và kiểm tra phân quyền, giá tính phía server, trừ tồn một lần, thiếu hàng rollback, OTP, thanh toán và đối soát.
-- Trước khi thao tác lệnh mẫu: `python3 backend2/tests/verify_seed_data.py` để kiểm tra dữ liệu ban đầu. Kết quả đã chạy ở [KIEM_TRA_LUU_DU_LIEU.md](KIEM_TRA_LUU_DU_LIEU.md).
+```sh
+mvn -f backend2/pom.xml clean package
+# Khi stack audit riêng cổng 18089 đang chạy, DEMO_MODE=true:
+python3 backend2/tests/verify_jsp_flow.py
+python3 backend2/tests/verify_servlet_flow.py
+python3 backend2/tests/verify_audit_edges.py
+```
 
-Tất cả API trả JSON dạng `{ "success": true, "data": ... }`; lỗi trả HTTP `400/401/403/404/409/503` và `message`. Quyền được kiểm tra ở backend từ phiên Tomcat. Next.js giữ tên/role trong localStorage chỉ để hiển thị menu.
+Test JSP gửi form thật qua HTTP, kiểm tra ba vai trò, bản nháp chưa ghi DB, chống xác nhận lặp, mã hóa tiếng Việt, escape nội dung, kho/dịch vụ, phân công, checklist, OTP và thanh toán. Test nghiệp vụ cũ kiểm tra thêm giá tính phía server, giá lịch sử, trừ kho một lần và thiếu hàng rollback. Các test HTTP ghi mặc định vào cổng audit 18089, tạo dữ liệu thử riêng và giữ để đối chiếu. [Cách dựng stack audit](HUONG_DAN_CHAY_THUC_TE.md), [kết quả rà soát cuối](docs/RA_SOAT_CUOI.md).
+
+`verify_seed_data.py` dùng trước khi thay đổi các phiếu seed. `verify_otp_rules.py` cần một stack test riêng có TTL ngắn như hướng dẫn đầu file.
